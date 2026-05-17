@@ -316,6 +316,9 @@ class VisualOverlayView(
         currentIndex++; externStepPending = false; updateTargetRect()
     }
 
+    private val handler = Handler(Looper.getMainLooper())
+    private val resetExternPending = Runnable { externStepPending = false }
+
     fun advanceStepExternally() {
         if (showComplete) {
             onAllStepsDone?.invoke()
@@ -324,6 +327,8 @@ class VisualOverlayView(
         if (externStepPending) return
         externStepPending = true
         currentIndex++; updateTargetRect()
+        handler.removeCallbacks(resetExternPending)
+        handler.postDelayed(resetExternPending, 500)
     }
 
     private fun updateTargetRect() {

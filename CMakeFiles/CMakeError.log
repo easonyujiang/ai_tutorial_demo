@@ -1,17 +1,0 @@
-Detecting C compiler ABI info failed to compile with the following output:
-Change Dir: E:/Create/Code/ai_tutorial_demo/CMakeFiles/CMakeTmp
-
-Run Build Command(s):C:\Users\xuany\AppData\Local\Android\sdk\cmake\3.22.1\bin\ninja.exe cmTC_7defe && ninja: fatal: GetOverlappedResult: 操作成功完成。
-
-
-
-
-
-Determining if the C compiler works failed with the following output:
-Change Dir: E:/Create/Code/ai_tutorial_demo/CMakeFiles/CMakeTmp
-
-Run Build Command(s):C:\Users\xuany\AppData\Local\Android\sdk\cmake\3.22.1\bin\ninja.exe cmTC_6601a && ninja: fatal: GetOverlappedResult: 操作成功完成。
-
-
-
-

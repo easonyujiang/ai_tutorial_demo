@@ -6,21 +6,18 @@ import android.view.accessibility.AccessibilityEvent
 
 class TutorialAccessibilityService : AccessibilityService() {
 
-    private var lastClassName = ""
     private var serviceStartTime = 0L
     private var lastAdvanceTime = 0L
 
     override fun onServiceConnected() {
         serviceStartTime = System.currentTimeMillis()
         val info = AccessibilityServiceInfo().apply {
-            eventTypes = AccessibilityEvent.TYPE_WINDOW_STATE_CHANGED or
-                AccessibilityEvent.TYPE_VIEW_CLICKED
+            eventTypes = AccessibilityEvent.TYPE_VIEW_CLICKED
             feedbackType = AccessibilityServiceInfo.FEEDBACK_GENERIC
             notificationTimeout = 300
             flags = AccessibilityServiceInfo.DEFAULT
         }
         serviceInfo = info
-        lastClassName = ""
         lastAdvanceTime = 0L
     }
 
@@ -31,16 +28,6 @@ class TutorialAccessibilityService : AccessibilityService() {
         if (pkgName == "com.example.frontend") return
 
         when (event.eventType) {
-            AccessibilityEvent.TYPE_WINDOW_STATE_CHANGED -> {
-                val className = event.className?.toString() ?: return
-                if (className.isEmpty()) return
-
-                if (lastClassName.isNotEmpty() && lastClassName != className) {
-                    doAdvance()
-                }
-                lastClassName = className
-            }
-
             AccessibilityEvent.TYPE_VIEW_CLICKED -> {
                 doAdvance()
             }
