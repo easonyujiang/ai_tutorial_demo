@@ -86,6 +86,13 @@ class _HomeScreenState extends State<HomeScreen> {
       );
       if (ok == true) {
         await OverlayService.openAccessibilitySettings();
+        if (!mounted) return;
+        ScaffoldMessenger.of(context).showSnackBar(
+          const SnackBar(
+            content: Text('请开启无障碍服务后返回重新操作', textScaleFactor: 1.0),
+          ),
+        );
+        return;
       }
     }
 
