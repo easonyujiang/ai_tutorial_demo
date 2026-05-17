@@ -1,0 +1,7 @@
+venv/
+__pycache__/
+*.pyc
+.env
+backend/.env
+frontend/build/
+backend/demo_videos/
