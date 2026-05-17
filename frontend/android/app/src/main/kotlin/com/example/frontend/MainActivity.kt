@@ -20,9 +20,12 @@ class MainActivity : FlutterActivity() {
                 when (call.method) {
                     "startOverlay" -> {
                         val stepsJson = call.argument<String>("steps") ?: "[]"
+                        val targetPackage = call.argument<String>("targetPackage")
+                        val targetActivity = call.argument<String>("targetActivity")
 
-                        val intent = Intent(Settings.ACTION_SETTINGS)
-                        intent.addFlags(Intent.FLAG_ACTIVITY_NEW_TASK)
+                        val intent = TutorialTargetResolver.resolveIntent(
+                            this, targetPackage, targetActivity
+                        )
                         startActivity(intent)
 
                         android.os.Handler(android.os.Looper.getMainLooper()).postDelayed({
