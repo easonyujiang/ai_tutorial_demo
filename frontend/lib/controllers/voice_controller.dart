@@ -128,8 +128,10 @@ class VoiceController extends ChangeNotifier {
     _audioStreamSub = null;
   }
 
-  void disposeController() {
+  @override
+  void dispose() {
     _disposed = true;
     stop();
+    super.dispose();
   }
 }

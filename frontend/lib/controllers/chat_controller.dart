@@ -160,7 +160,8 @@ class ChatController extends ChangeNotifier {
     _pollTimer = null;
   }
 
-  void disposeController() {
+  @override
+  void dispose() {
     _disposed = true;
     _pollTimer?.cancel();
     _pollTimer = null;
@@ -168,5 +169,6 @@ class ChatController extends ChangeNotifier {
       _voiceSocket?.close();
     } catch (_) {}
     _voiceSocket = null;
+    super.dispose();
   }
 }
