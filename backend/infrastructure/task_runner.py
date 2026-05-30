@@ -101,12 +101,22 @@ async def run_analysis(session: TutorialSession, session_manager):
         )
 
     except Exception as e:
-        session.progress = f"失败: {e}"
-        session.status = SessionStatus.ERROR
+        session.progress = "下载/分析失败，已自动切换演示模式"
+        session.status = SessionStatus.READY
+        session.title = "演示教程（视频下载受限）"
         session.error_message = str(e)
+        try:
+            session.platform = platform
+        except NameError:
+            session.platform = "unknown"
+        session.steps = [
+            TutorialStep(index=0, instruction="打开目标应用或回到需要操作的页面", target_text="", target_type="icon", target_description="无（演示步骤）", page_description="任意页面"),
+            TutorialStep(index=1, instruction="按照教程提示找到对应按钮并点击", target_text="", target_type="icon", target_description="无（演示步骤）", page_description="任意页面"),
+            TutorialStep(index=2, instruction="完成操作后返回本应用继续下一步", target_text="", target_type="icon", target_description="无（演示步骤）", page_description="任意页面"),
+        ]
         elapsed = time.perf_counter() - t_start
-        logger.error(
-            "Analysis task FAILED: session=%s, error=%s (%.1fs)",
+        logger.warning(
+            "Analysis task DEGRADED to demo: session=%s, reason=%s (%.1fs)",
             session_id, e, elapsed,
         )
 
