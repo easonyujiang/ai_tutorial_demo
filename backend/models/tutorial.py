@@ -14,6 +14,8 @@ class TutorialStep(BaseModel):
     index: int
     instruction: str
     target_text: str
+    target_description: str = ""
+    target_type: str = "text"
     page_description: str = ""
     status: str = "pending"
     completed_at: datetime | None = None

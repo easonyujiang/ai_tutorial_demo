@@ -1,0 +1,50 @@
+[
+  {
+    "id": "5db608fa7397",
+    "title": "阻止应用摇一摇广告",
+    "description": "通过关闭应用加速度传感器权限从而阻止应用摇一摇广告跳转",
+    "device_allowlist": "Xiaomi",
+    "os_allowlist": "MIUI 14",
+    "launch_package": "com.miui.securitycenter",
+    "launch_activity": "",
+    "steps": [
+      {
+        "instruction": "在手机管家中找到并点击“隐私与安全”选项。",
+        "target_text": "隐私与安全",
+        "target_description": "",
+        "target_type": "text",
+        "page_description": "手机管家主界面"
+      },
+      {
+        "instruction": "在隐私保护页面中，向下滑动找到“其他权限”区域，并点击进入",
+        "target_text": "其他权限",
+        "target_description": "",
+        "target_type": "text",
+        "page_description": "隐私保护页面"
+      },
+      {
+        "instruction": "在其他权限列表中，找到并点击“获取设备动作与方向”权限。",
+        "target_text": "获取设备动作与方向",
+        "target_description": "",
+        "target_type": "text",
+        "page_description": "其他权限列表"
+      },
+      {
+        "instruction": "点击右上方的三小点",
+        "target_text": "",
+        "target_description": "右上角三个点",
+        "target_type": "icon",
+        "page_description": "获取设备动作与方向的权限管理页面"
+      },
+      {
+        "instruction": "点击全部拒绝",
+        "target_text": "全部拒绝",
+        "target_description": "",
+        "target_type": "text",
+        "page_description": ""
+      }
+    ],
+    "created_at": "2026-05-30T18:17:05.436968",
+    "updated_at": "2026-05-30T18:56:46.810815"
+  }
+]

@@ -4,11 +4,15 @@ class Tutorial {
   final String id;
   final String title;
   final List<TutorialStep> steps;
+  final String launchPackage;
+  final String launchActivity;
 
   const Tutorial({
     required this.id,
     required this.title,
     required this.steps,
+    this.launchPackage = '',
+    this.launchActivity = '',
   });
 
   factory Tutorial.fromJson(Map<String, dynamic> json) {
@@ -54,6 +58,8 @@ class TutorialStep {
   final int index;
   final String instruction;
   final String targetText;
+  final String targetDescription;
+  final String targetType;
   final String pageDescription;
   final String status;
 
@@ -65,6 +71,8 @@ class TutorialStep {
     this.index = 0,
     required this.instruction,
     this.targetText = '',
+    this.targetDescription = '',
+    this.targetType = 'text',
     this.pageDescription = '',
     this.status = 'pending',
     this.imageAsset = '',
@@ -77,6 +85,8 @@ class TutorialStep {
       index: index,
       instruction: instruction,
       targetText: targetText,
+      targetDescription: targetDescription,
+      targetType: targetType,
       pageDescription: pageDescription,
       status: status,
       imageAsset: imageAsset,
@@ -92,6 +102,8 @@ class TutorialStep {
       index: index,
       instruction: (json['instruction'] ?? '') as String,
       targetText: (json['target_text'] ?? '') as String,
+      targetDescription: (json['target_description'] ?? '') as String,
+      targetType: (json['target_type'] ?? 'text') as String,
       pageDescription: (json['page_description'] ?? '') as String,
       status: (json['status'] ?? 'pending') as String,
       imageAsset: (json['image'] ?? '') as String,

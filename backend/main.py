@@ -9,9 +9,10 @@ from slowapi.util import get_remote_address
 from slowapi.errors import RateLimitExceeded
 
 from infrastructure.logger import setup_logging, get_logger
+from infrastructure.log_capture import get_log_capture
 from infrastructure.session_manager import SessionManager
 from config import settings
-from routers import tutorial_router, chat_router, legacy_router
+from routers import tutorial_router, chat_router, legacy_router, monitor_router, skill_router
 
 load_dotenv()
 
@@ -23,11 +24,13 @@ limiter = Limiter(key_func=get_remote_address, default_limits=[settings.rate_lim
 @asynccontextmanager
 async def lifespan(app: FastAPI):
     setup_logging()
+    get_log_capture()
     logger.info("=" * 50)
     logger.info("AI Tutorial Backend v2.0.0 starting...")
     app.state.session_manager = SessionManager()
     app.state.ocr_service = None
     logger.info("SessionManager initialized")
+    logger.info("Monitor available at http://localhost:8000/monitor")
     yield
     logger.info("AI Tutorial Backend shutting down")
 
@@ -68,6 +71,8 @@ async def log_requests(request: Request, call_next):
 app.include_router(tutorial_router.router)
 app.include_router(chat_router.router)
 app.include_router(legacy_router.router)
+app.include_router(monitor_router.router)
+app.include_router(skill_router.router)
 
 @app.get("/")
 async def root():

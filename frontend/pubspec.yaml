@@ -34,11 +34,8 @@ dependencies:
   http: ^1.1.0
   provider: ^6.1.0
   uuid: ^4.0.0
-  record: ^5.0.0
   permission_handler: ^11.0.0
-  path_provider: ^2.1.0
   web_socket_channel: ^3.0.0
-  just_audio: ^0.9.0
 
 dev_dependencies:
   flutter_test:

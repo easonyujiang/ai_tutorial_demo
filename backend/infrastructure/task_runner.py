@@ -5,10 +5,9 @@ import shutil
 from models.tutorial import TutorialSession, TutorialStep, SessionStatus
 from services.video_service import (
     detect_platform,
-    extract_douyin_url,
+    extract_url,
     resolve_short_url,
     download_video,
-    PLATFORM_DOUYIN,
 )
 from services.ai_service import analyze_video
 from infrastructure.logger import get_logger
@@ -26,21 +25,20 @@ async def run_analysis(session: TutorialSession, session_manager):
 
     try:
         raw_input = session.video_url
-        platform = detect_platform(raw_input)
+        pure_url = extract_url(raw_input)
+        platform = detect_platform(pure_url)
         logger.info("Platform detected: %s", platform)
 
-        if platform == PLATFORM_DOUYIN:
-            pure_url = extract_douyin_url(raw_input)
-            video_url = resolve_short_url(pure_url)
-        else:
-            video_url = resolve_short_url(raw_input)
+        video_url = resolve_short_url(pure_url)
 
         logger.info("Starting video download...")
         video_path = await asyncio.to_thread(download_video, video_url, session.session_id)
         logger.info("Video download complete: %s", video_path)
 
         logger.info("Starting AI video analysis...")
-        title, steps_data = await asyncio.to_thread(analyze_video, video_path)
+        result = await asyncio.to_thread(analyze_video, video_path)
+        title = result["title"]
+        steps_data = result["steps"]
 
         session.title = title
         session.platform = platform
@@ -49,6 +47,8 @@ async def run_analysis(session: TutorialSession, session_manager):
                 index=i,
                 instruction=s["instruction"],
                 target_text=s["target_text"],
+                target_description=s.get("target_description", ""),
+                target_type=s.get("target_type", "text"),
                 page_description=s["page_description"],
             )
             for i, s in enumerate(steps_data)

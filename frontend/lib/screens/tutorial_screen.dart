@@ -137,9 +137,14 @@ class _TutorialScreenState extends State<TutorialScreen> {
     }
 
     final step = widget.tutorial.steps[_currentIndex];
-    final displayInstruction = _currentTarget.isNotEmpty
-        ? '${step.instruction}\n\n请查找: "$_currentTarget"'
-        : step.instruction;
+    String displayInstruction;
+    if (_currentTarget.isNotEmpty) {
+      displayInstruction = '${step.instruction}\n\n请查找: "$_currentTarget"';
+    } else if (step.targetDescription.isNotEmpty) {
+      displayInstruction = '${step.instruction}\n\n🎯 目标位置: ${step.targetDescription}';
+    } else {
+      displayInstruction = step.instruction;
+    }
 
     return Scaffold(
       body: LayoutBuilder(

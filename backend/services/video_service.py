@@ -33,7 +33,7 @@ def detect_platform(raw: str) -> str:
     return PLATFORM_UNKNOWN
 
 
-def extract_douyin_url(raw_text: str) -> str:
+def extract_url(raw_text: str) -> str:
     match = re.search(r"https?://[\w\-./?=&#:%]+", raw_text)
     if match:
         return match.group(0)

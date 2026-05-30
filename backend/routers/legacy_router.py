@@ -5,7 +5,7 @@ from fastapi import APIRouter, HTTPException
 from infrastructure.logger import get_logger
 from services.video_service import (
     detect_platform,
-    extract_douyin_url,
+    extract_url,
     resolve_short_url,
     download_video,
 )
@@ -20,10 +20,8 @@ router = APIRouter()
 @router.get("/api/video-info")
 async def video_info(url: str):
     try:
-        platform = detect_platform(url)
-        pure_url = url
-        if platform == "douyin":
-            pure_url = extract_douyin_url(url)
+        pure_url = extract_url(url)
+        platform = detect_platform(pure_url)
         resolved = resolve_short_url(pure_url)
         return {"title": resolved, "platform": platform}
     except Exception as e:
@@ -39,21 +37,22 @@ async def analyze_video(request: dict):
     session_id = "legacy_direct"
 
     try:
-        platform = detect_platform(url)
-        if platform == "douyin":
-            pure = extract_douyin_url(url)
-            video_url = resolve_short_url(pure)
-        else:
-            video_url = resolve_short_url(url)
+        pure = extract_url(url)
+        platform = detect_platform(pure)
+        video_url = resolve_short_url(pure)
 
         video_path = await asyncio.to_thread(download_video, video_url, session_id)
-        title, steps_data = await asyncio.to_thread(ai_analyze, video_path)
+        result = await asyncio.to_thread(ai_analyze, video_path)
+        title = result["title"]
+        steps_data = result["steps"]
 
         steps = [
             {
                 "image": "",
                 "instruction": s["instruction"],
                 "target_text": s.get("target_text", ""),
+                "target_type": s.get("target_type", "text"),
+                "target_description": s.get("target_description", ""),
                 "page_description": s.get("page_description", ""),
                 "rect": {
                     "left": 0.05 + (i * 0.05),

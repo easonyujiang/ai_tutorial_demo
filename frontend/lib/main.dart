@@ -5,7 +5,7 @@ import 'config.dart';
 import 'controllers/app_ui_controller.dart';
 import 'controllers/chat_controller.dart';
 import 'controllers/voice_controller.dart';
-import 'screens/home_screen.dart';
+import 'screens/app_shell.dart';
 import 'services/chat_service.dart';
 import 'services/tutorial_service.dart';
 import 'services/voice_service.dart';
@@ -43,13 +43,14 @@ class MyApp extends StatelessWidget {
         title: 'AI 教程助手',
         debugShowCheckedModeBanner: false,
         theme: ThemeData(
+          brightness: Brightness.dark,
           colorScheme: ColorScheme.fromSeed(
             seedColor: const Color(0xFF667EEA),
-            primary: const Color(0xFF667EEA),
+            brightness: Brightness.dark,
           ),
-          useMaterial3: false,
+          scaffoldBackgroundColor: const Color(0xFF0F0F1A),
         ),
-        home: const HomeScreen(),
+        home: const AppShell(),
       ),
     );
   }

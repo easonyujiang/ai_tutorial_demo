@@ -115,6 +115,18 @@ class TutorialService {
       throw ApiException(408, '请求超时，请检查网络连接');
     }
   }
+
+  Future<List<Map<String, dynamic>>> fetchSkills() async {
+    return List<Map<String, dynamic>>.from(await _get('/api/skills') as List);
+  }
+
+  Future<Map<String, dynamic>> createSkill(Map<String, dynamic> body) async {
+    return await _post('/api/skills', body: body);
+  }
+
+  Future<Map<String, dynamic>> analyzeUrlForSkill(String videoUrl) async {
+    return await _post('/api/skills/analyze', body: {'url': videoUrl});
+  }
 }
 
 
