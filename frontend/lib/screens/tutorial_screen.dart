@@ -1,16 +1,14 @@
 import 'package:flutter/material.dart';
 import '../models/tutorial.dart';
-import '../services/tutorial_service.dart';
 import '../services/overlay_service.dart';
+import '../services/tutorial_service.dart';
 
 class TutorialScreen extends StatefulWidget {
-  final TutorialService service;
   final String sessionId;
   final Tutorial tutorial;
 
   const TutorialScreen({
     super.key,
-    required this.service,
     required this.sessionId,
     required this.tutorial,
   });
@@ -21,10 +19,11 @@ class TutorialScreen extends StatefulWidget {
 
 class _TutorialScreenState extends State<TutorialScreen> {
   int _currentIndex = 0;
-  late Size _screenSize;
+  Size? _screenSize;
   bool _loading = false;
   String _currentTarget = '';
   String _currentPageDesc = '';
+  late final TutorialService _service = MockTutorialService();
 
   @override
   void initState() {
@@ -32,10 +31,38 @@ class _TutorialScreenState extends State<TutorialScreen> {
     _executeCurrentStep();
   }
 
+  Future<bool> _confirmExit() async {
+    return (await showDialog<bool>(
+          context: context,
+          builder: (ctx) => AlertDialog(
+            title: const Text('退出教程'),
+            content: const Text('确定要退出当前教程吗？'),
+            actions: [
+              TextButton(
+                onPressed: () => Navigator.of(ctx).pop(false),
+                child: const Text('继续教程'),
+              ),
+              FilledButton(
+                onPressed: () => Navigator.of(ctx).pop(true),
+                child: const Text('退出'),
+              ),
+            ],
+          ),
+        )) ??
+        false;
+  }
+
+  Future<void> _onExit() async {
+    if (!await _confirmExit()) return;
+    await OverlayService.stopOverlay();
+    if (!mounted) return;
+    Navigator.of(context).pop();
+  }
+
   Future<void> _executeCurrentStep() async {
     setState(() => _loading = true);
     try {
-      final execData = await widget.service.executeStep(widget.sessionId);
+      final execData = await _service.executeStep(widget.sessionId);
       if (!mounted) return;
       if (execData.completed) {
         _showCompleteDialog();
@@ -56,9 +83,10 @@ class _TutorialScreenState extends State<TutorialScreen> {
   }
 
   Future<void> _confirmAndNext() async {
+    if (_screenSize == null) return;
     setState(() => _loading = true);
     try {
-      await widget.service.confirmStep(widget.sessionId, _currentIndex);
+      await _service.confirmStep(widget.sessionId, _currentIndex);
       if (!mounted) return;
       if (_currentIndex < widget.tutorial.steps.length - 1) {
         setState(() => _currentIndex++);
@@ -96,7 +124,6 @@ class _TutorialScreenState extends State<TutorialScreen> {
     );
   }
 
-  // --- UI 部分完全保持原样式，只改了交互逻辑 ---
   @override
   Widget build(BuildContext context) {
     if (widget.tutorial.steps.isEmpty) {
@@ -106,10 +133,9 @@ class _TutorialScreenState extends State<TutorialScreen> {
     }
 
     final step = widget.tutorial.steps[_currentIndex];
-    final displayInstruction =
-        _currentTarget.isNotEmpty
-            ? '${step.instruction}\n\n请查找: "$_currentTarget"'
-            : step.instruction;
+    final displayInstruction = _currentTarget.isNotEmpty
+        ? '${step.instruction}\n\n请查找: "$_currentTarget"'
+        : step.instruction;
 
     return Scaffold(
       body: LayoutBuilder(
@@ -121,7 +147,6 @@ class _TutorialScreenState extends State<TutorialScreen> {
             child: Stack(
               fit: StackFit.expand,
               children: [
-                // 底层深灰色占位
                 Container(
                   color: const Color(0xFF2D2D2D),
                   child: Center(
@@ -130,19 +155,13 @@ class _TutorialScreenState extends State<TutorialScreen> {
                       children: [
                         Text(
                           '步骤 ${_currentIndex + 1}/${widget.tutorial.steps.length}',
-                          style: const TextStyle(
-                            color: Colors.white54,
-                            fontSize: 40,
-                          ),
+                          style: const TextStyle(color: Colors.white54, fontSize: 40),
                         ),
                         const SizedBox(height: 16),
                         if (_currentPageDesc.isNotEmpty)
                           Text(
                             '当前页面: $_currentPageDesc',
-                            style: const TextStyle(
-                              color: Colors.white38,
-                              fontSize: 18,
-                            ),
+                            style: const TextStyle(color: Colors.white38, fontSize: 18),
                           ),
                         const SizedBox(height: 24),
                         Padding(
@@ -173,6 +192,22 @@ class _TutorialScreenState extends State<TutorialScreen> {
                       errorBuilder: (_, __, ___) => const SizedBox.shrink(),
                     ),
                   ),
+                Positioned(
+                  top: MediaQuery.of(context).padding.top + 12,
+                  right: 16,
+                  child: Material(
+                    color: Colors.black.withAlpha(115),
+                    shape: const CircleBorder(),
+                    child: InkWell(
+                      onTap: _onExit,
+                      customBorder: const CircleBorder(),
+                      child: const Padding(
+                        padding: EdgeInsets.all(10),
+                        child: Icon(Icons.close, color: Colors.white, size: 24),
+                      ),
+                    ),
+                  ),
+                ),
               ],
             ),
           );

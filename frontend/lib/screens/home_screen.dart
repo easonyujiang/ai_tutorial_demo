@@ -1,8 +1,13 @@
 import 'package:flutter/material.dart';
+import 'package:flutter/services.dart';
+import 'package:provider/provider.dart';
+
+import '../controllers/app_ui_controller.dart';
+import '../controllers/chat_controller.dart';
+import '../controllers/voice_controller.dart';
 import '../models/tutorial.dart';
 import '../services/overlay_service.dart';
-import '../services/tutorial_service.dart';
-import 'loading_screen.dart';
+import '../widgets/floating_avatar.dart';
 import 'tutorial_screen.dart';
 
 class HomeScreen extends StatefulWidget {
@@ -12,34 +17,53 @@ class HomeScreen extends StatefulWidget {
   State<HomeScreen> createState() => _HomeScreenState();
 }
 
-class _HomeScreenState extends State<HomeScreen> {
-  final TextEditingController _controller = TextEditingController();
-  late final TutorialService _service;
-  bool _isLoading = false;
-
+class _HomeScreenState extends State<HomeScreen> with WidgetsBindingObserver {
   @override
   void initState() {
     super.initState();
-    _service = MockTutorialService();
+    WidgetsBinding.instance.addObserver(this);
   }
 
   @override
   void dispose() {
-    _controller.dispose();
+    WidgetsBinding.instance.removeObserver(this);
     super.dispose();
   }
 
-  Future<void> _onAnalyze() async {
-    final url = _controller.text.trim();
-    if (url.isEmpty) {
-      if (!mounted) return;
-      ScaffoldMessenger.of(context).showSnackBar(
-        const SnackBar(content: Text('请粘贴视频链接')),
-      );
-      return;
+  @override
+  Future<bool> didPopRoute() async {
+    final uiCtrl = context.read<AppUiController>();
+    if (uiCtrl.panelOpen) {
+      uiCtrl.closePanel();
+      return false;
     }
+    final confirm = await showDialog<bool>(
+      context: context,
+      builder: (ctx) => AlertDialog(
+        title: const Text('退出应用？'),
+        content: const Text('确定要退出 AI 教程助手吗？'),
+        actions: [
+          TextButton(
+            onPressed: () => Navigator.of(ctx).pop(false),
+            child: const Text('取消'),
+          ),
+          FilledButton(
+            onPressed: () => Navigator.of(ctx).pop(true),
+            child: const Text('退出'),
+          ),
+        ],
+      ),
+    );
+    if (confirm == true) {
+      SystemNavigator.pop();
+    }
+    return false;
+  }
 
-    setState(() => _isLoading = true);
+  Future<void> _startTutorial(Tutorial tutorial, String? sessionId) async {
+    final sid = sessionId ?? tutorial.id;
+    final uiCtrl = context.read<AppUiController>();
+    final voiceCtrl = context.read<VoiceController>();
 
     try {
       final canDraw = await OverlayService.canDrawOverlays();
@@ -48,9 +72,7 @@ class _HomeScreenState extends State<HomeScreen> {
           context: context,
           builder: (ctx) => AlertDialog(
             title: const Text('需要悬浮窗权限'),
-            content: const Text(
-              '为了在系统设置上显示引导层，需要授予「显示在其他应用上层」的权限。',
-            ),
+            content: const Text('为了在系统设置上显示引导层，需要授予「显示在其他应用上层」的权限。'),
             actions: [
               TextButton(
                 onPressed: () => Navigator.of(ctx).pop(false),
@@ -75,8 +97,7 @@ class _HomeScreenState extends State<HomeScreen> {
           builder: (ctx) => AlertDialog(
             title: const Text('需要无障碍权限'),
             content: const Text(
-              '为了自动推进教程步骤，需要开启无障碍服务。\n\n'
-              '请在下个页面中找到「frontend」并开启。',
+              '为了自动推进教程步骤，需要开启无障碍服务。\n\n请在下个页面中找到「frontend」并开启。',
             ),
             actions: [
               TextButton(
@@ -97,188 +118,114 @@ class _HomeScreenState extends State<HomeScreen> {
 
       if (!mounted) return;
 
-      // Step 1: Create session
-      final sessionId = await _service.createSession(url);
+      final reopenPanel = uiCtrl.panelOpen;
+      uiCtrl.markReopenAfterTutorial(reopenPanel);
+      uiCtrl.closePanel();
+      await voiceCtrl.stop();
 
-      // Step 2: Show loading screen while polling status
+      await OverlayService.startOverlay(tutorial: tutorial);
+
       if (!mounted) return;
       final result = await Navigator.of(context).push<bool>(
         MaterialPageRoute(
-          builder: (_) => LoadingScreen(service: _service, sessionId: sessionId),
+          builder: (_) => TutorialScreen(
+            sessionId: sid,
+            tutorial: tutorial,
+          ),
         ),
       );
 
-      if (result == true && mounted) {
-        // Step 3: Fetch steps
-        final status = await _service.getStatus(sessionId);
-        final tutorial = Tutorial(
-          id: sessionId,
-          title: status.title,
-          steps: status.steps,
-        );
-
-        await OverlayService.startOverlay(tutorial: tutorial);
-
-        if (!mounted) return;
-        await Navigator.of(context).push(
-          MaterialPageRoute(
-            builder: (_) => TutorialScreen(
-              service: _service,
-              sessionId: sessionId,
-              tutorial: tutorial,
-            ),
-          ),
-        );
+      if (!mounted) return;
+      if (uiCtrl.reopenPanelAfterTutorial && result != false) {
+        uiCtrl.openPanel();
+        uiCtrl.clearTutorialReopenFlag();
       }
     } catch (e) {
       if (!mounted) return;
       ScaffoldMessenger.of(context).showSnackBar(
         SnackBar(content: Text('启动失败：$e')),
       );
-    } finally {
-      if (mounted) {
-        setState(() => _isLoading = false);
-      }
     }
   }
 
-  // --- UI 完全保持原样式，未做任何修改 ---
   @override
   Widget build(BuildContext context) {
     return Scaffold(
-      backgroundColor: const Color(0xFF42A5F5),
-      body: SafeArea(
-        child: Center(
-          child: SingleChildScrollView(
-            padding: const EdgeInsets.all(32),
-            child: Column(
-              mainAxisSize: MainAxisSize.min,
-              children: [
-                const SizedBox(height: 40),
-                Container(
-                  width: 88,
-                  height: 88,
-                  decoration: BoxDecoration(
-                    color: Colors.white,
-                    borderRadius: BorderRadius.circular(24),
-                  ),
-                  child: const Icon(
-                    Icons.auto_awesome,
-                    color: Color(0xFF42A5F5),
-                    size: 48,
-                  ),
-                ),
-                const SizedBox(height: 24),
-                const Text(
-                  'AI 教程助手',
-                  style: TextStyle(
-                    color: Colors.white,
-                    fontSize: 34,
-                    fontWeight: FontWeight.w900,
-                    letterSpacing: 1.5,
-                    shadows: [
-                      Shadow(
-                        color: Color(0x40000000),
-                        blurRadius: 8,
-                        offset: Offset(0, 2),
+      backgroundColor: const Color(0xFF1A1A2E),
+      body: Stack(
+        children: [
+          Center(
+            child: SafeArea(
+              child: SingleChildScrollView(
+                padding: const EdgeInsets.all(32),
+                child: Column(
+                  mainAxisSize: MainAxisSize.min,
+                  children: [
+                    const SizedBox(height: 40),
+                    Container(
+                      width: 88,
+                      height: 88,
+                      decoration: BoxDecoration(
+                        gradient: const LinearGradient(
+                          colors: [Color(0xFF667EEA), Color(0xFF764BA2)],
+                        ),
+                        borderRadius: BorderRadius.circular(24),
                       ),
-                    ],
-                  ),
-                ),
-                const SizedBox(height: 14),
-                const Text(
-                  '粘贴视频链接，AI 解析操作步骤\n在您的真实界面上叠加引导',
-                  textAlign: TextAlign.center,
-                  style: TextStyle(
-                    color: Color(0xFFE3F2FD),
-                    fontSize: 20,
-                    height: 1.6,
-                    fontWeight: FontWeight.w500,
-                  ),
-                ),
-                const SizedBox(height: 48),
-                TextField(
-                  controller: _controller,
-                  enabled: !_isLoading,
-                  style: const TextStyle(
-                    fontSize: 20,
-                    color: Color(0xFF1A237E),
-                  ),
-                  decoration: InputDecoration(
-                    hintText: '粘贴视频链接',
-                    hintStyle: const TextStyle(
-                      color: Color(0xFF90CAF9),
-                      fontSize: 20,
+                      child: const Icon(Icons.auto_awesome, color: Colors.white, size: 48),
                     ),
-                    prefixIcon: const Icon(
-                      Icons.link,
-                      color: Color(0xFF42A5F5),
-                      size: 28,
-                    ),
-                    filled: true,
-                    fillColor: Colors.white,
-                    border: OutlineInputBorder(
-                      borderRadius: BorderRadius.circular(20),
-                      borderSide: BorderSide.none,
-                    ),
-                    enabledBorder: OutlineInputBorder(
-                      borderRadius: BorderRadius.circular(20),
-                      borderSide: BorderSide.none,
-                    ),
-                    focusedBorder: OutlineInputBorder(
-                      borderRadius: BorderRadius.circular(20),
-                      borderSide: const BorderSide(
-                        color: Color(0xFF1565C0),
-                        width: 2.5,
+                    const SizedBox(height: 24),
+                    const Text(
+                      'AI 教程助手',
+                      style: TextStyle(
+                        color: Colors.white,
+                        fontSize: 34,
+                        fontWeight: FontWeight.w900,
+                        letterSpacing: 1.5,
                       ),
                     ),
-                    contentPadding: const EdgeInsets.symmetric(
-                      horizontal: 24,
-                      vertical: 20,
+                    const SizedBox(height: 14),
+                    const Text(
+                      '点击右上角头像开始对话\n粘贴视频链接，AI 帮你生成操作教程',
+                      textAlign: TextAlign.center,
+                      style: TextStyle(
+                        color: Color(0xFFB0B0D0),
+                        fontSize: 16,
+                        height: 1.6,
+                      ),
                     ),
-                  ),
-                  keyboardType: TextInputType.url,
-                  textInputAction: TextInputAction.done,
-                  onSubmitted: (_) => _onAnalyze(),
-                ),
-                const SizedBox(height: 24),
-                SizedBox(
-                  width: double.infinity,
-                  height: 64,
-                  child: FilledButton.icon(
-                    onPressed: _isLoading ? null : _onAnalyze,
-                    icon: _isLoading
-                        ? const SizedBox(
-                            width: 26,
-                            height: 26,
-                            child: CircularProgressIndicator(
-                              strokeWidth: 3,
-                              color: Color(0xFF42A5F5),
+                    const SizedBox(height: 48),
+                    Consumer<AppUiController>(
+                      builder: (_, uiCtrl, __) {
+                        if (uiCtrl.panelOpen) return const SizedBox.shrink();
+                        return SizedBox(
+                          width: double.infinity,
+                          height: 56,
+                          child: FilledButton.icon(
+                            onPressed: () => uiCtrl.openPanel(),
+                            icon: const Icon(Icons.chat_bubble_outline, size: 24),
+                            label: const Text('打开对话', style: TextStyle(fontSize: 18)),
+                            style: FilledButton.styleFrom(
+                              backgroundColor: const Color(0xFF667EEA),
+                              shape: RoundedRectangleBorder(
+                                borderRadius: BorderRadius.circular(16),
+                              ),
                             ),
-                          )
-                        : const Icon(Icons.analytics_outlined, size: 30),
-                    label: Text(
-                      _isLoading ? '正在启动...' : '分析',
-                      style: const TextStyle(
-                        fontSize: 24,
-                        fontWeight: FontWeight.w800,
-                      ),
+                          ),
+                        );
+                      },
                     ),
-                    style: FilledButton.styleFrom(
-                      backgroundColor: Colors.white,
-                      foregroundColor: const Color(0xFF1565C0),
-                      disabledBackgroundColor: Colors.white54,
-                      shape: RoundedRectangleBorder(
-                        borderRadius: BorderRadius.circular(20),
-                      ),
-                    ),
-                  ),
+                  ],
                 ),
-                const SizedBox(height: 40),
-              ],
+              ),
             ),
           ),
-        ),
+          FloatingAvatar(
+            uiController: context.watch<AppUiController>(),
+            chatController: context.watch<ChatController>(),
+            voiceController: context.watch<VoiceController>(),
+            onStartTutorial: _startTutorial,
+          ),
+        ],
       ),
     );
   }
