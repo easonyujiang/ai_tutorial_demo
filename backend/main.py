@@ -11,7 +11,7 @@ from slowapi.errors import RateLimitExceeded
 from infrastructure.logger import setup_logging, get_logger
 from infrastructure.session_manager import SessionManager
 from config import settings
-from routers import tutorial_router, chat_router
+from routers import tutorial_router, chat_router, legacy_router
 
 load_dotenv()
 
@@ -67,6 +67,7 @@ async def log_requests(request: Request, call_next):
 
 app.include_router(tutorial_router.router)
 app.include_router(chat_router.router)
+app.include_router(legacy_router.router)
 
 @app.get("/")
 async def root():

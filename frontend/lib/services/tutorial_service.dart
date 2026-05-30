@@ -1,6 +1,7 @@
 import 'dart:async';
 import 'dart:convert';
 import 'package:http/http.dart' as http;
+import '../data/demo_tutorials.dart';
 import '../models/tutorial.dart';
 
 class ApiException implements Exception {
@@ -48,8 +49,8 @@ class TutorialService {
 
   String _extractMessage(String body) {
     try {
-      final json = jsonDecode(body);
-      return json['detail'] ?? json['message'] ?? body;
+      final data = jsonDecode(body);
+      return data['detail'] ?? data['message'] ?? body;
     } catch (_) {
       return body;
     }
@@ -118,6 +119,8 @@ class TutorialService {
 
 
 class MockTutorialService extends TutorialService {
+  Tutorial _demoTutorial = DemoTutorials.wifiTutorial;
+
   MockTutorialService() : super(baseUrl: 'http://localhost:8000');
 
   @override
@@ -138,17 +141,17 @@ class MockTutorialService extends TutorialService {
     return SessionStatusData(
       sessionId: sessionId,
       status: 'ready',
-      title: '小米手机去广告教程',
-      totalSteps: 4,
+      title: _demoTutorial.title,
+      totalSteps: _demoTutorial.steps.length,
       currentStep: 0,
-      steps: Tutorial.mockSteps,
+      steps: _demoTutorial.steps,
     );
   }
 
   @override
   Future<ExecuteData> executeStep(String sessionId) async {
     await Future.delayed(const Duration(milliseconds: 200));
-    final steps = Tutorial.mockSteps;
+    final steps = _demoTutorial.steps;
     return ExecuteData(
       completed: false,
       stepIndex: 0,
@@ -157,5 +160,17 @@ class MockTutorialService extends TutorialService {
       targetText: steps[0].targetText,
       pageDescription: steps[0].pageDescription,
     );
+  }
+
+  @override
+  Future<StepActionData> confirmStep(String sessionId, int stepIndex) async {
+    await Future.delayed(const Duration(milliseconds: 100));
+    return StepActionData(ok: true, nextStep: stepIndex + 1);
+  }
+
+  @override
+  Future<StepActionData> skipStep(String sessionId, int stepIndex, {String reason = ''}) async {
+    await Future.delayed(const Duration(milliseconds: 100));
+    return StepActionData(ok: true, nextStep: stepIndex + 1);
   }
 }

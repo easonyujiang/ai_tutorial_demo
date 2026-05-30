@@ -2,15 +2,18 @@ import 'package:flutter/material.dart';
 import '../models/tutorial.dart';
 import '../services/overlay_service.dart';
 import '../services/tutorial_service.dart';
+import '../widgets/step_overlay.dart';
 
 class TutorialScreen extends StatefulWidget {
   final String sessionId;
   final Tutorial tutorial;
+  final TutorialService? service;
 
   const TutorialScreen({
     super.key,
     required this.sessionId,
     required this.tutorial,
+    this.service,
   });
 
   @override
@@ -23,11 +26,12 @@ class _TutorialScreenState extends State<TutorialScreen> {
   bool _loading = false;
   String _currentTarget = '';
   String _currentPageDesc = '';
-  late final TutorialService _service = MockTutorialService();
+  late final TutorialService _service;
 
   @override
   void initState() {
     super.initState();
+    _service = widget.service ?? MockTutorialService();
     _executeCurrentStep();
   }
 
@@ -147,49 +151,76 @@ class _TutorialScreenState extends State<TutorialScreen> {
             child: Stack(
               fit: StackFit.expand,
               children: [
-                Container(
-                  color: const Color(0xFF2D2D2D),
-                  child: Center(
-                    child: Column(
-                      mainAxisSize: MainAxisSize.min,
-                      children: [
-                        Text(
-                          '步骤 ${_currentIndex + 1}/${widget.tutorial.steps.length}',
-                          style: const TextStyle(color: Colors.white54, fontSize: 40),
-                        ),
-                        const SizedBox(height: 16),
-                        if (_currentPageDesc.isNotEmpty)
+                if (_screenSize != null && step.relativeRect != Rect.zero)
+                  StepOverlay(
+                    screenSize: _screenSize!,
+                    relativeRect: step.relativeRect,
+                    instruction: displayInstruction,
+                    bubbleDirection: step.bubbleDirection,
+                  )
+                else
+                  Container(
+                    color: const Color(0xFF2D2D2D),
+                    child: Center(
+                      child: Column(
+                        mainAxisSize: MainAxisSize.min,
+                        children: [
                           Text(
-                            '当前页面: $_currentPageDesc',
-                            style: const TextStyle(color: Colors.white38, fontSize: 18),
+                            '步骤 ${_currentIndex + 1}/${widget.tutorial.steps.length}',
+                            style: const TextStyle(color: Colors.white54, fontSize: 40),
                           ),
-                        const SizedBox(height: 24),
-                        Padding(
-                          padding: const EdgeInsets.symmetric(horizontal: 32),
-                          child: Text(
-                            displayInstruction,
-                            textAlign: TextAlign.center,
-                            style: const TextStyle(
-                              color: Colors.white70,
-                              fontSize: 22,
-                              height: 1.5,
+                          const SizedBox(height: 16),
+                          if (_currentPageDesc.isNotEmpty)
+                            Text(
+                              '当前页面: $_currentPageDesc',
+                              style: const TextStyle(color: Colors.white38, fontSize: 18),
+                            ),
+                          const SizedBox(height: 24),
+                          Padding(
+                            padding: const EdgeInsets.symmetric(horizontal: 32),
+                            child: Text(
+                              displayInstruction,
+                              textAlign: TextAlign.center,
+                              style: const TextStyle(
+                                color: Colors.white70,
+                                fontSize: 22,
+                                height: 1.5,
+                              ),
                             ),
                           ),
-                        ),
-                        if (_loading) ...[
-                          const SizedBox(height: 32),
-                          const CircularProgressIndicator(color: Colors.white54),
+                          if (_loading) ...[
+                            const SizedBox(height: 32),
+                            const CircularProgressIndicator(color: Colors.white54),
+                          ],
                         ],
-                      ],
+                      ),
                     ),
                   ),
-                ),
                 if (step.imageAsset.isNotEmpty)
                   Positioned.fill(
                     child: Image.asset(
                       step.imageAsset,
                       fit: BoxFit.cover,
                       errorBuilder: (_, __, ___) => const SizedBox.shrink(),
+                    ),
+                  ),
+                if (_loading)
+                  Positioned(
+                    bottom: 80,
+                    left: 0,
+                    right: 0,
+                    child: Center(
+                      child: Container(
+                        padding: const EdgeInsets.all(12),
+                        decoration: BoxDecoration(
+                          color: Colors.black87,
+                          borderRadius: BorderRadius.circular(12),
+                        ),
+                        child: const CircularProgressIndicator(
+                          color: Colors.blue,
+                          strokeWidth: 2,
+                        ),
+                      ),
                     ),
                   ),
                 Positioned(
