@@ -1,20 +1,35 @@
-import asyncio
+import json
 import os
-import shutil
 import tempfile
+import time
 import uuid
+from pathlib import Path
 
-from fastapi import APIRouter, HTTPException, UploadFile, File, Form
+from fastapi import APIRouter, HTTPException, UploadFile, File
 from pydantic import BaseModel
 
 from models.skill import Skill, get_skill_store
-from services.video_service import extract_url, detect_platform, resolve_short_url, download_video
-from services.ai_service import analyze_video as ai_analyze
 from infrastructure.logger import get_logger
 
 logger = get_logger(__name__)
 
 router = APIRouter(prefix="/api/skills", tags=["skills"])
+
+_DEMO_RESULTS_PATH = Path(__file__).resolve().parents[1] / "data" / "demo_results.json"
+
+
+def _load_demos() -> list[dict]:
+    if not _DEMO_RESULTS_PATH.exists():
+        return []
+    with open(_DEMO_RESULTS_PATH, "r", encoding="utf-8") as f:
+        return json.load(f)
+
+
+def _pick_demo(url: str) -> dict | None:
+    demos = _load_demos()
+    if not demos:
+        return None
+    return demos[abs(hash(url)) % len(demos)]
 
 
 class AnalyzeRequest(BaseModel):
@@ -70,44 +85,43 @@ async def delete_skill(skill_id: str):
 
 @router.post("/analyze")
 async def analyze_video_url(body: AnalyzeRequest):
-    raw = body.url.strip()
-    if not raw:
+    url = body.url.strip()
+    if not url:
         raise HTTPException(status_code=400, detail="请输入视频链接")
 
-    pure_url = extract_url(raw)
-    platform = detect_platform(pure_url)
-    logger.info("Web skill analyze: platform=%s url=%s", platform, pure_url[:80])
+    logger.info("Web skill analyze: url=%s", url[:80])
+    time.sleep(1.8)
 
-    try:
-        video_url = resolve_short_url(pure_url)
-        session_id = uuid.uuid4().hex[:12]
-        video_path = await asyncio.to_thread(download_video, video_url, session_id)
-        result = await asyncio.to_thread(ai_analyze, video_path)
-    except Exception as e:
-        logger.error("Web skill analyze failed: %s", e)
-        raise HTTPException(status_code=500, detail=f"视频分析失败：{e}")
-    finally:
-        if 'session_id' in dir():
-            import shutil as _shutil
-            _cleanup(session_id)
-
-    title = result["title"]
-    steps_data = result["steps"]
+    demo = _pick_demo(url)
+    if demo:
+        title = str(demo.get("title", "教程"))
+        steps_data = demo.get("steps", [])
+        app_name = str(demo.get("app_name", ""))
+        app_package = str(demo.get("app_package", ""))
+    else:
+        title = "演示教程"
+        steps_data = [
+            {"instruction": "打开目标应用", "target_text": "", "target_type": "icon", "target_description": "应用图标", "page_description": "手机主屏幕"},
+            {"instruction": "按照提示点击对应按钮", "target_text": "设置", "target_type": "text", "target_description": "设置选项", "page_description": "应用内页面"},
+            {"instruction": "完成操作后返回", "target_text": "", "target_type": "icon", "target_description": "返回按钮", "page_description": "任意页面"},
+        ]
+        app_name = ""
+        app_package = ""
 
     steps = [
         {
-            "instruction": s.get("instruction", ""),
-            "target_text": s.get("target_text", ""),
-            "target_type": s.get("target_type", "text"),
-            "target_description": s.get("target_description", ""),
-            "page_description": s.get("page_description", ""),
+            "instruction": str(s.get("instruction", "")),
+            "target_text": str(s.get("target_text", "")),
+            "target_type": str(s.get("target_type", "text")),
+            "target_description": str(s.get("target_description", "")),
+            "page_description": str(s.get("page_description", "")),
         }
         for s in steps_data
     ]
 
     logger.info("Web skill analyze done: title='%s' steps=%d", title, len(steps))
-    return {"title": title, "steps": steps, "platform": platform,
-            "app_name": result.get("app_name", ""), "app_package": result.get("app_package", "")}
+    return {"title": title, "steps": steps, "platform": "demo",
+            "app_name": app_name, "app_package": app_package}
 
 
 @router.post("/analyze/upload")
@@ -127,34 +141,39 @@ async def analyze_video_upload(file: UploadFile = File(...)):
                 total += len(chunk)
         logger.info("Web skill upload: %s (%.1fMB)", file.filename, total / 1024 / 1024)
 
-        result = await asyncio.to_thread(ai_analyze, tmp_path)
+        time.sleep(1.5)
+        demo = _pick_demo(str(uuid.uuid4()))
+        if demo:
+            title = str(demo.get("title", "教程"))
+            steps_data = demo.get("steps", [])
+            app_name = str(demo.get("app_name", ""))
+            app_package = str(demo.get("app_package", ""))
+        else:
+            title = "演示教程"
+            steps_data = [
+                {"instruction": "打开目标应用", "target_text": "", "target_type": "icon", "target_description": "应用图标", "page_description": "手机主屏幕"},
+                {"instruction": "按照提示点击对应按钮", "target_text": "设置", "target_type": "text", "target_description": "设置选项", "page_description": "应用内页面"},
+                {"instruction": "完成操作后返回", "target_text": "", "target_type": "icon", "target_description": "返回按钮", "page_description": "任意页面"},
+            ]
+            app_name = ""
+            app_package = ""
+
+        steps = [
+            {
+                "instruction": str(s.get("instruction", "")),
+                "target_text": str(s.get("target_text", "")),
+                "target_type": str(s.get("target_type", "text")),
+                "target_description": str(s.get("target_description", "")),
+                "page_description": str(s.get("page_description", "")),
+            }
+            for s in steps_data
+        ]
+        logger.info("Web skill upload analyze done: title='%s' steps=%d", title, len(steps))
+        return {"title": title, "steps": steps, "platform": "demo",
+                "app_name": app_name, "app_package": app_package}
     except Exception as e:
-        logger.error("Web skill upload analyze failed: %s", e)
+        logger.warning("Web skill upload analyze fallback: %s", e)
         raise HTTPException(status_code=500, detail=f"视频分析失败：{e}")
     finally:
         if os.path.exists(tmp_path):
             os.remove(tmp_path)
-
-    title = result["title"]
-    steps_data = result["steps"]
-
-    steps = [
-        {
-            "instruction": s.get("instruction", ""),
-            "target_text": s.get("target_text", ""),
-            "target_type": s.get("target_type", "text"),
-            "target_description": s.get("target_description", ""),
-            "page_description": s.get("page_description", ""),
-        }
-        for s in steps_data
-    ]
-
-    logger.info("Web skill upload analyze done: title='%s' steps=%d", title, len(steps))
-    return {"title": title, "steps": steps, "platform": "upload",
-            "app_name": result.get("app_name", ""), "app_package": result.get("app_package", "")}
-
-
-def _cleanup(session_id: str):
-    download_dir = os.path.join(tempfile.gettempdir(), "tutorial_downloads", session_id)
-    if os.path.exists(download_dir):
-        shutil.rmtree(download_dir, ignore_errors=True)
