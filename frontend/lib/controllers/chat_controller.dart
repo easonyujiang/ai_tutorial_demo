@@ -4,6 +4,7 @@ import 'dart:io';
 import 'package:flutter/foundation.dart';
 import 'package:uuid/uuid.dart';
 
+import '../data/demo_tutorials.dart';
 import '../models/chat_message.dart';
 import '../models/tutorial.dart';
 import '../services/chat_service.dart';
@@ -111,28 +112,64 @@ class ChatController extends ChangeNotifier {
       final sessionId = await _tutorialService.createSession(url);
       _currentSessionId = sessionId;
 
-      final ready = await _tutorialService.waitForReady(sessionId);
-      updateMessage(loadingId, ready ? '视频解析完成！' : '视频解析超时，请重试。',
-          kind: ready ? ChatMessageKind.tutorialReady : ChatMessageKind.error);
-
-      if (ready) {
+      for (int i = 0; i < 120; i++) {
         final status = await _tutorialService.getStatus(sessionId);
-        _currentTutorial = Tutorial(
-          id: sessionId,
-          title: status.title,
-          steps: status.steps,
-        );
-        addMessage(ChatMessage(
-          id: _uuid.v4(),
-          sender: MessageSender.agent,
-          text: '教程 "${status.title}" 已就绪，共 ${status.steps.length} 个步骤。点击下方按钮开始。',
-          timestamp: DateTime.now(),
-          kind: ChatMessageKind.tutorialReady,
-        ));
+        if (status.status == 'ready') {
+          _currentTutorial = Tutorial(
+            id: sessionId,
+            title: status.title,
+            steps: status.steps,
+          );
+          updateMessage(loadingId, '视频解析完成！',
+              kind: ChatMessageKind.tutorialReady);
+          addMessage(ChatMessage(
+            id: _uuid.v4(),
+            sender: MessageSender.agent,
+            text: '教程 "${status.title}" 已就绪，共 ${status.steps.length} 个步骤。点击下方按钮开始。',
+            timestamp: DateTime.now(),
+            kind: ChatMessageKind.tutorialReady,
+          ));
+          return;
+        }
+        if (status.status == 'error') {
+          throw ApiException(500, status.errorMessage.isNotEmpty ? status.errorMessage : '分析失败');
+        }
+        if (status.progress.isNotEmpty && status.progress != '分析完成') {
+          updateMessage(loadingId, status.progress);
+        }
+        await Future.delayed(const Duration(milliseconds: 1000));
       }
+      updateMessage(loadingId, '视频解析超时，请重试。',
+          kind: ChatMessageKind.error);
     } catch (e) {
-      updateMessage(loadingId, '解析失败：$e');
+      _currentSessionId = null;
+      _currentTutorial = DemoTutorials.wifiTutorial;
+      updateMessage(
+        loadingId,
+        '解析失败，点击右侧箭头可展开查看模型服务商错误。',
+        kind: ChatMessageKind.error,
+      );
+      addMessage(ChatMessage(
+        id: _uuid.v4(),
+        sender: MessageSender.agent,
+        text: '服务器当前未成功返回教程结果，你可以先继续体验演示任务。',
+        timestamp: DateTime.now(),
+        kind: ChatMessageKind.error,
+        metadata: {
+          'title': '模型服务商错误',
+          'detail': _formatErrorDetail(e),
+          'can_continue': true,
+          'button_label': '继续任务',
+        },
+      ));
     }
+  }
+
+  String _formatErrorDetail(Object error) {
+    if (error is ApiException) {
+      return 'HTTP ${error.statusCode}\n${error.message}';
+    }
+    return error.toString();
   }
 
   Future<String?> sendTextMessage(String text) async {

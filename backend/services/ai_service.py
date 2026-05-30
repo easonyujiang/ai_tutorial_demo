@@ -1,9 +1,11 @@
 import base64
 import json
 import os
+import shutil
 import subprocess
 import tempfile
 
+import cv2
 from openai import OpenAI
 
 from config import settings
@@ -38,12 +40,16 @@ SYSTEM_PROMPT = """你是一个视频教程分析助手。你会收到从视频�
 6. 拆分 3~8 个关键步骤
 7. 只返回 JSON，不要有任何其他文字"""
 
-MAX_FRAMES = 8
-COMPRESS_HEIGHT = 480
-COMPRESS_FPS = 8
-COMPRESS_CRF = 28
-COMPRESS_PRESET = "fast"
-EXTRACT_FRAME_HEIGHT = 1080
+def _ffmpeg_available() -> bool:
+    return shutil.which("ffmpeg") is not None and shutil.which("ffprobe") is not None
+
+
+MAX_FRAMES = 3
+COMPRESS_HEIGHT = 240
+COMPRESS_FPS = 2
+COMPRESS_CRF = 40
+COMPRESS_PRESET = "ultrafast"
+EXTRACT_FRAME_HEIGHT = 360
 
 
 def _is_placeholder_api_key(api_key: str) -> bool:
@@ -85,13 +91,30 @@ def _demo_analysis(reason: str = "") -> dict:
     }
 
 
-def _get_video_duration(input_path: str) -> float:
+def _get_video_duration(video_path: str) -> float:
+    cap = cv2.VideoCapture(video_path)
+    if not cap.isOpened():
+        try:
+            return _get_video_duration_ffmpeg(video_path)
+        except Exception:
+            return 60.0
+    fps = cap.get(cv2.CAP_PROP_FPS) or 25.0
+    frame_count = cap.get(cv2.CAP_PROP_FRAME_COUNT)
+    cap.release()
+    if fps <= 0:
+        fps = 25.0
+    if frame_count <= 0:
+        frame_count = fps * 60
+    return frame_count / fps
+
+
+def _get_video_duration_ffmpeg(video_path: str) -> float:
     result = subprocess.run(
         [
             "ffprobe", "-v", "error",
             "-show_entries", "format=duration",
             "-of", "default=noprint_wrappers=1:nokey=1",
-            input_path,
+            video_path,
         ],
         capture_output=True,
         text=True,
@@ -109,15 +132,59 @@ def _compress_video(input_path: str) -> str:
     os.makedirs(compressed_dir, exist_ok=True)
     output_path = os.path.join(compressed_dir, f"compressed_{uuid.uuid4().hex}.mp4")
 
-    logger.info(
-        "Compressing video: %s -> %s (scale=%dp, fps=%d, crf=%d)",
-        os.path.basename(input_path),
-        os.path.basename(output_path),
-        COMPRESS_HEIGHT,
-        COMPRESS_FPS,
-        COMPRESS_CRF,
-    )
+    logger.info("Compressing video: %s -> %s", os.path.basename(input_path), os.path.basename(output_path))
 
+    if not _ffmpeg_available():
+        _compress_video_cv2(input_path, output_path)
+    else:
+        _compress_video_ffmpeg(input_path, output_path)
+
+    size_mb = os.path.getsize(output_path) / (1024 * 1024)
+    logger.info("Video compressed: %.1fMB", size_mb)
+    return output_path
+
+
+def _compress_video_cv2(input_path: str, output_path: str):
+    cap = cv2.VideoCapture(input_path)
+    if not cap.isOpened():
+        shutil.copy2(input_path, output_path)
+        return
+
+    orig_fps = cap.get(cv2.CAP_PROP_FPS) or 25.0
+    orig_w = int(cap.get(cv2.CAP_PROP_FRAME_WIDTH))
+    orig_h = int(cap.get(cv2.CAP_PROP_FRAME_HEIGHT))
+
+    scale = COMPRESS_HEIGHT / orig_h
+    new_w = max(1, int(orig_w * scale) // 2 * 2)
+    new_h = COMPRESS_HEIGHT // 2 * 2
+
+    step = max(1, round(orig_fps / COMPRESS_FPS))
+    target_fps = orig_fps / step
+
+    fourcc = cv2.VideoWriter_fourcc(*'avc1')
+    writer = cv2.VideoWriter(output_path, fourcc, target_fps, (new_w, new_h))
+    if not writer.isOpened():
+        cap.release()
+        shutil.copy2(input_path, output_path)
+        return
+
+    frame_idx = 0
+    while True:
+        ret, frame = cap.read()
+        if not ret:
+            break
+        if frame_idx % step != 0:
+            frame_idx += 1
+            continue
+        resized = cv2.resize(frame, (new_w, new_h), interpolation=cv2.INTER_NEAREST)
+        writer.write(resized)
+        frame_idx += 1
+
+    cap.release()
+    writer.release()
+
+
+def _compress_video_ffmpeg(input_path: str, output_path: str):
     subprocess.run(
         [
             "ffmpeg", "-y",
@@ -135,51 +202,44 @@ def _compress_video(input_path: str) -> str:
         text=True,
     )
 
-    size_mb = os.path.getsize(output_path) / (1024 * 1024)
-    logger.info("Video compressed: %.1fMB", size_mb)
-    return output_path
-
 
 def _extract_frames(video_path: str) -> list[bytes]:
     duration = _get_video_duration(video_path)
     frame_count = min(MAX_FRAMES, max(3, int(duration / 3)))
 
-    logger.info("Extracting %d frames from video...", frame_count)
+    logger.info("Extracting %d frames via OpenCV...", frame_count)
+
+    cap = cv2.VideoCapture(video_path)
+    if not cap.isOpened():
+        logger.warning("OpenCV cannot open video, returning empty frames")
+        return []
 
     frames = []
-    tmp_dir = tempfile.mkdtemp()
-
     try:
         interval = duration / (frame_count + 1)
         for i in range(frame_count):
             t = interval * (i + 1)
-            output_file = os.path.join(tmp_dir, f"frame_{i:03d}.jpg")
-            subprocess.run(
-                [
-                    "ffmpeg", "-y",
-                    "-ss", str(t),
-                    "-i", video_path,
-                    "-vframes", "1",
-                    "-q:v", "3",
-                    "-vf", f"scale={EXTRACT_FRAME_HEIGHT}:-2",
-                    output_file,
-                ],
-                check=True,
-                capture_output=True,
-                text=True,
-            )
+            cap.set(cv2.CAP_PROP_POS_MSEC, t * 1000)
+            ret, frame = cap.read()
+            if not ret:
+                cap.set(cv2.CAP_PROP_POS_FRAMES, 0)
+                cap.set(cv2.CAP_PROP_POS_MSEC, t * 1000)
+                ret, frame = cap.read()
+                if not ret:
+                    continue
 
-            with open(output_file, "rb") as f:
-                frame_data = f.read()
-            frames.append(frame_data)
-            os.remove(output_file)
-            logger.debug("Frame %d/%d extracted at %.1fs, size=%d bytes",
-                         i + 1, frame_count, t, len(frame_data))
+            h, w = frame.shape[:2]
+            if h > EXTRACT_FRAME_HEIGHT:
+                scale = EXTRACT_FRAME_HEIGHT / h
+                new_w = int(w * scale)
+                frame = cv2.resize(frame, (new_w, EXTRACT_FRAME_HEIGHT),
+                                   interpolation=cv2.INTER_NEAREST)
+
+            encode_param = [cv2.IMWRITE_JPEG_QUALITY, 30]
+            _, buf = cv2.imencode('.jpg', frame, encode_param)
+            frames.append(buf.tobytes())
     finally:
-        try:
-            os.rmdir(tmp_dir)
-        except OSError:
-            pass
+        cap.release()
 
     logger.info("Frames extracted: %d total", len(frames))
     return frames
@@ -197,7 +257,7 @@ def analyze_video(video_path: str) -> dict:
         raise RuntimeError("OPENAI_BASE_URL 环境变量未设置")
 
     logger.info("AI analysis starting (model=%s)", model)
-    client = OpenAI(api_key=api_key, base_url=base_url)
+    client = OpenAI(api_key=api_key, base_url=base_url, timeout=120.0)
 
     work_path = video_path
     try:
@@ -206,6 +266,10 @@ def analyze_video(video_path: str) -> dict:
         raise RuntimeError(f"视频压缩失败：{e.stderr}")
 
     frames = _extract_frames(work_path)
+
+    if not frames:
+        logger.warning("No frames extracted (ffmpeg unavailable), using demo analysis")
+        return _demo_analysis("ffmpeg 未安装，无法抽帧")
 
     image_parts = []
     total_size = 0

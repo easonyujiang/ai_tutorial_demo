@@ -54,6 +54,7 @@ class _AppShellState extends State<AppShell> with WidgetsBindingObserver {
   }
 
   Future<void> _startTutorial(Tutorial tutorial, String? sessionId) async {
+    final isMockFlow = sessionId == null;
     final sid = sessionId ?? tutorial.id;
     final uiCtrl = context.read<AppUiController>();
     final voiceCtrl = context.read<VoiceController>();

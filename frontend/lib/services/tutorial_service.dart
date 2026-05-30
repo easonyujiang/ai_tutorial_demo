@@ -81,7 +81,7 @@ class TutorialService {
     return SessionStatusData.fromJson(data);
   }
 
-  Future<bool> waitForReady(String sessionId, {int intervalMs = 2000, int maxRetries = 150}) async {
+  Future<bool> waitForReady(String sessionId, {int intervalMs = 1000, int maxRetries = 120}) async {
     for (int i = 0; i < maxRetries; i++) {
       final status = await getStatus(sessionId);
       if (status.status == 'ready') return true;
@@ -143,11 +143,20 @@ class TutorialService {
   Future<Map<String, dynamic>> analyzeUrlForSkill(String videoUrl) async {
     return await _post('/api/skills/analyze', body: {'url': videoUrl});
   }
+
+  Future<List<Map<String, dynamic>>> fetchDemos() async {
+    final raw = await _getList('/api/videos/demos');
+    return raw.map((e) => e as Map<String, dynamic>).toList();
+  }
+
+  Future<Map<String, dynamic>> fetchDemo(String demoId) async {
+    return await _get('/api/videos/demos/$demoId');
+  }
 }
 
 
 class MockTutorialService extends TutorialService {
-  Tutorial _demoTutorial = DemoTutorials.wifiTutorial;
+  final Tutorial _demoTutorial = DemoTutorials.wifiTutorial;
 
   MockTutorialService() : super(baseUrl: 'http://localhost:8000');
 

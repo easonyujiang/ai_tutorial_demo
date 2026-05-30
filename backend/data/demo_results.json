@@ -1,0 +1,137 @@
+[
+  {
+    "id": "2e95bf25b68d43de9c89491a6ca0f923",
+    "title": "小米手机隐私相关设置操作指南",
+    "video_filename": "2e95bf25b68d43de9c89491a6ca0f923.mp4",
+    "video_url": "http://localhost:8000/videos/2e95bf25b68d43de9c89491a6ca0f923.mp4",
+    "steps": [
+      {
+        "instruction": "进入手机设置中的隐私设置页面",
+        "target_text": "隐私设置",
+        "target_type": "text",
+        "target_description": "页面标题为“隐私设置”",
+        "page_description": "手机设置界面，显示隐私相关选项"
+      },
+      {
+        "instruction": "在设置页面中找到并进入“辅助功能设置”",
+        "target_text": "辅助功能设置",
+        "target_type": "text",
+        "target_description": "页面标题为“辅助功能设置”",
+        "page_description": "手机设置界面，显示辅助功能相关选项"
+      }
+    ],
+    "app_name": "设置",
+    "app_package": "",
+    "pre_analyzed_at": 1780151137.833498
+  },
+  {
+    "id": "40ef1d2aaf034c28a2ca15c8ea1c78eb",
+    "title": "手机管家隐私保护与传感器权限设置教程",
+    "video_filename": "40ef1d2aaf034c28a2ca15c8ea1c78eb.mp4",
+    "video_url": "http://localhost:8000/videos/40ef1d2aaf034c28a2ca15c8ea1c78eb.mp4",
+    "steps": [
+      {
+        "instruction": "打开手机管家应用",
+        "target_text": "",
+        "target_type": "icon",
+        "target_description": "",
+        "page_description": "手机桌面或应用列表页面"
+      },
+      {
+        "instruction": "在手机管家中找到并点击‘隐私保护’选项",
+        "target_text": "隐私保护",
+        "target_type": "text",
+        "target_description": "位于手机管家界面中的菜单项",
+        "page_description": "手机管家主界面"
+      },
+      {
+        "instruction": "在隐私保护页面中找到并点击‘滑到保护’选项",
+        "target_text": "滑到保护",
+        "target_type": "text",
+        "target_description": "隐私保护子菜单中的选项",
+        "page_description": "隐私保护设置页面"
+      },
+      {
+        "instruction": "进入滑到保护设置后，找到并点击‘应用权限设置’选项",
+        "target_text": "应用权限设置",
+        "target_type": "text",
+        "target_description": "滑到保护页面中的选项",
+        "page_description": "滑到保护设置页面"
+      },
+      {
+        "instruction": "在应用权限设置中找到并操作‘获取加速传感器信息’相关设置",
+        "target_text": "获取加速传感器信息",
+        "target_type": "text",
+        "target_description": "应用权限设置中的权限项",
+        "page_description": "应用权限设置页面"
+      }
+    ],
+    "app_name": "手机管家",
+    "app_package": "",
+    "pre_analyzed_at": 1780151159.703212
+  },
+  {
+    "id": "Test_compressed",
+    "title": "小米系统广告设置操作",
+    "video_filename": "Test_compressed.mp4",
+    "video_url": "http://localhost:8000/videos/Test_compressed.mp4",
+    "steps": [
+      {
+        "instruction": "进入手机主屏幕，查看桌面上的应用图标",
+        "target_text": "",
+        "target_type": "icon",
+        "target_description": "",
+        "page_description": "手机主屏幕界面，显示多个应用图标"
+      },
+      {
+        "instruction": "在主屏幕上找到并点击“设置”图标，进入设置页面",
+        "target_text": "设置",
+        "target_type": "text",
+        "target_description": "屏幕左侧或指定位置的“设置”文字按钮",
+        "page_description": "手机主屏幕界面，显示多个应用图标"
+      },
+      {
+        "instruction": "在设置页面中找到并点击“系统广告”选项，进入系统广告设置",
+        "target_text": "系统广告",
+        "target_type": "text",
+        "target_description": "设置页面列表中的“系统广告”选项",
+        "page_description": "小米账号设置页面，显示多个设置选项列表"
+      }
+    ],
+    "app_name": "设置",
+    "app_package": "com.miui.securitycenter",
+    "pre_analyzed_at": 1780151186.93394
+  },
+  {
+    "id": "a2d984223f59470f895238573c105cb4",
+    "title": "在应用商店搜索APK Pure并查看MIUI14修复信息",
+    "video_filename": "a2d984223f59470f895238573c105cb4.mp4",
+    "video_url": "http://localhost:8000/videos/a2d984223f59470f895238573c105cb4.mp4",
+    "steps": [
+      {
+        "instruction": "在应用商店中搜索“APK Pure”",
+        "target_text": "APK Pure",
+        "target_type": "text",
+        "target_description": "搜索框中输入的文字",
+        "page_description": "应用商店搜索页面"
+      },
+      {
+        "instruction": "找到APK Pure应用并检查更新",
+        "target_text": "找到更新",
+        "target_type": "text",
+        "target_description": "页面中显示的“找到更新”按钮",
+        "page_description": "APK Pure应用更新页面"
+      },
+      {
+        "instruction": "查看MIUI14修复相关内容",
+        "target_text": "",
+        "target_type": "icon",
+        "target_description": "",
+        "page_description": "展示手机参数及MIUI14修复信息的页面"
+      }
+    ],
+    "app_name": "应用商店",
+    "app_package": "",
+    "pre_analyzed_at": 1780151197.078927
+  }
+]

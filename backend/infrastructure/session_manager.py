@@ -30,16 +30,16 @@ class SessionManager:
         self._cleanup_expired()
         with self._lock:
             session = self._sessions.get(session_id)
-        if session:
-            logger.debug("Session get: %s (status=%s)", session_id, session.status.value)
-        else:
+        if not session:
             logger.debug("Session get: %s -> NOT FOUND", session_id)
         return session
 
     def update(self, session_id: str, session: TutorialSession):
         with self._lock:
+            old = self._sessions.get(session_id)
             self._sessions[session_id] = session
-        logger.info("Session updated: %s (status=%s)", session_id, session.status.value)
+        if old is None or old.status != session.status:
+            logger.info("Session updated: %s (status=%s)", session_id, session.status.value)
 
     def delete(self, session_id: str):
         with self._lock:

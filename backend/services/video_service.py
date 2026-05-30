@@ -54,6 +54,11 @@ def resolve_short_url(raw_url: str) -> str:
         "no_warnings": True,
         "skip_download": True,
         "extract_flat": False,
+        "http_headers": {
+            "User-Agent": "Mozilla/5.0 (Windows NT 10.0; Win64; x64) AppleWebKit/537.36 (KHTML, like Gecko) Chrome/131.0.0.0 Safari/537.36",
+            "Accept": "text/html,application/xhtml+xml,application/xml;q=0.9,image/webp,*/*;q=0.8",
+            "Accept-Language": "zh-CN,zh;q=0.9,en;q=0.8",
+        },
     }
 
     try:
@@ -75,6 +80,15 @@ def _build_download_options(output_path: str, platform: str) -> dict:
         "merge_output_format": "mp4",
         "quiet": True,
         "no_warnings": True,
+        "http_headers": {
+            "User-Agent": "Mozilla/5.0 (Windows NT 10.0; Win64; x64) AppleWebKit/537.36 (KHTML, like Gecko) Chrome/131.0.0.0 Safari/537.36",
+            "Accept": "text/html,application/xhtml+xml,application/xml;q=0.9,image/webp,*/*;q=0.8",
+            "Accept-Language": "zh-CN,zh;q=0.9,en;q=0.8",
+        },
+        "retries": 3,
+        "fragment_retries": 3,
+        "retry_sleep_functions": {"fragment": lambda n: 3},
+        "socket_timeout": 30,
     }
 
     if platform == PLATFORM_DOUYIN:
@@ -84,8 +98,7 @@ def _build_download_options(output_path: str, platform: str) -> dict:
         }
     else:
         base["format"] = (
-            "bestvideo[height<=720][ext=mp4]+bestaudio[ext=m4a]"
-            "/best[height<=720][ext=mp4]/best[height<=720]/best"
+            "best[height<=720][ext=mp4]/best[height<=720]/best"
         )
 
     return base

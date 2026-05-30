@@ -207,12 +207,14 @@ class _ChatPanelState extends State<ChatPanel> {
       controller: _scrollController,
       padding: const EdgeInsets.symmetric(horizontal: 12, vertical: 8),
       itemCount: chat.messages.length,
-      separatorBuilder: (_, __) => const SizedBox(height: 12),
+      separatorBuilder: (_, _) => const SizedBox(height: 12),
       itemBuilder: (context, index) {
         final message = chat.messages[index];
         return _MessageBubble(
           message: message,
-          onStartTutorial: message.kind == ChatMessageKind.tutorialReady && chat.currentTutorial != null
+          onStartTutorial: ((message.kind == ChatMessageKind.tutorialReady) ||
+                  (message.kind == ChatMessageKind.error && message.metadata?['can_continue'] == true)) &&
+              chat.currentTutorial != null
               ? () => widget.onStartTutorial(chat.currentTutorial!, chat.currentSessionId)
               : null,
         );
@@ -237,14 +239,22 @@ class _ChatPanelState extends State<ChatPanel> {
   }
 }
 
-class _MessageBubble extends StatelessWidget {
+class _MessageBubble extends StatefulWidget {
   final ChatMessage message;
   final VoidCallback? onStartTutorial;
 
   const _MessageBubble({required this.message, this.onStartTutorial});
 
   @override
+  State<_MessageBubble> createState() => _MessageBubbleState();
+}
+
+class _MessageBubbleState extends State<_MessageBubble> {
+  bool _expanded = false;
+
+  @override
   Widget build(BuildContext context) {
+    final message = widget.message;
     final isUser = message.sender == MessageSender.user;
     final isSystem = message.sender == MessageSender.system;
     final bg = isSystem
@@ -293,18 +303,85 @@ class _MessageBubble extends StatelessWidget {
             if (isUser) _AvatarIcon(message.sender),
           ],
         ),
-        if (message.kind == ChatMessageKind.tutorialReady && onStartTutorial != null) ...[
+        if (message.kind == ChatMessageKind.error && message.metadata?['detail'] != null) ...[
+          const SizedBox(height: 8),
+          Align(
+            alignment: Alignment.centerLeft,
+            child: Container(
+              constraints: BoxConstraints(maxWidth: MediaQuery.of(context).size.width * 0.75),
+              padding: const EdgeInsets.all(12),
+              decoration: BoxDecoration(
+                color: const Color(0xFFFFF4F4),
+                borderRadius: BorderRadius.circular(12),
+                border: Border.all(color: const Color(0xFFFFD6D6)),
+              ),
+              child: Column(
+                crossAxisAlignment: CrossAxisAlignment.start,
+                children: [
+                  InkWell(
+                    onTap: () => setState(() => _expanded = !_expanded),
+                    borderRadius: BorderRadius.circular(8),
+                    child: Padding(
+                      padding: const EdgeInsets.symmetric(vertical: 2),
+                      child: Row(
+                        children: [
+                          const Icon(Icons.error_outline, color: Color(0xFFD14343), size: 18),
+                          const SizedBox(width: 8),
+                          Expanded(
+                            child: Text(
+                              (message.metadata?['title'] ?? '错误详情').toString(),
+                              style: const TextStyle(
+                                color: Color(0xFFD14343),
+                                fontSize: 13,
+                                fontWeight: FontWeight.w600,
+                              ),
+                            ),
+                          ),
+                          Icon(
+                            _expanded ? Icons.keyboard_arrow_up : Icons.keyboard_arrow_down,
+                            color: const Color(0xFFD14343),
+                          ),
+                        ],
+                      ),
+                    ),
+                  ),
+                  if (_expanded) ...[
+                    const SizedBox(height: 10),
+                    Container(
+                      width: double.infinity,
+                      padding: const EdgeInsets.all(10),
+                      decoration: BoxDecoration(
+                        color: Colors.white,
+                        borderRadius: BorderRadius.circular(10),
+                      ),
+                      child: Text(
+                        message.metadata?['detail'].toString() ?? '',
+                        style: const TextStyle(
+                          color: Color(0xFF7A2E2E),
+                          fontSize: 12,
+                          height: 1.5,
+                        ),
+                      ),
+                    ),
+                  ],
+                ],
+              ),
+            ),
+          ),
+        ],
+        if ((message.kind == ChatMessageKind.tutorialReady || message.metadata?['can_continue'] == true) &&
+            widget.onStartTutorial != null) ...[
           const SizedBox(height: 8),
           Align(
             alignment: Alignment.centerLeft,
             child: FilledButton(
-              onPressed: onStartTutorial,
+              onPressed: widget.onStartTutorial,
               style: FilledButton.styleFrom(
                 backgroundColor: const Color(0xFF667EEA),
                 foregroundColor: Colors.white,
                 shape: RoundedRectangleBorder(borderRadius: BorderRadius.circular(12)),
               ),
-              child: const Text('开始教程'),
+              child: Text((message.metadata?['button_label'] ?? '开始教程').toString()),
             ),
           ),
         ],

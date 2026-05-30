@@ -1,8 +1,10 @@
 import asyncio
 import time
 import shutil
+import os
 
 from models.tutorial import TutorialSession, TutorialStep, SessionStatus
+from config import settings
 from services.video_service import (
     detect_platform,
     extract_url,
@@ -15,6 +17,13 @@ from infrastructure.logger import get_logger
 logger = get_logger(__name__)
 
 
+def _update_progress(session, manager, msg, status=None):
+    session.progress = msg
+    if status:
+        session.status = status
+    manager.update(session.session_id, session)
+
+
 async def run_analysis(session: TutorialSession, session_manager):
     session_id = session.session_id
     logger.info("=" * 40)
@@ -24,6 +33,21 @@ async def run_analysis(session: TutorialSession, session_manager):
     t_start = time.perf_counter()
 
     try:
+        api_key = settings.openai_api_key or os.getenv("OPENAI_API_KEY", "")
+        is_placeholder = not api_key or "your-api-key" in api_key.lower() or api_key == "sk-your-api-key-here"
+        if is_placeholder:
+            _update_progress(session, session_manager, "演示模式：跳过视频下载与分析", SessionStatus.READY)
+            session.title = "演示教程（API Key 未配置）"
+            session.platform = "demo"
+            session.steps = [
+                TutorialStep(index=0, instruction="打开目标应用或回到需要操作的页面", target_text="", target_type="icon", target_description="无（演示步骤）", page_description="任意页面"),
+                TutorialStep(index=1, instruction="按照教程提示找到对应按钮并点击", target_text="", target_type="icon", target_description="无（演示步骤）", page_description="任意页面"),
+                TutorialStep(index=2, instruction="完成操作后返回本应用继续下一步", target_text="", target_type="icon", target_description="无（演示步骤）", page_description="任意页面"),
+            ]
+            elapsed = time.perf_counter() - t_start
+            logger.info("Analysis task SKIPPED (demo mode): session=%s (%.1fs)", session_id, elapsed)
+            return
+
         raw_input = session.video_url
         pure_url = extract_url(raw_input)
         platform = detect_platform(pure_url)
@@ -31,15 +55,18 @@ async def run_analysis(session: TutorialSession, session_manager):
 
         video_url = resolve_short_url(pure_url)
 
+        _update_progress(session, session_manager, "正在下载视频...")
         logger.info("Starting video download...")
         video_path = await asyncio.to_thread(download_video, video_url, session.session_id)
         logger.info("Video download complete: %s", video_path)
 
+        _update_progress(session, session_manager, "正在压缩视频...")
         logger.info("Starting AI video analysis...")
         result = await asyncio.to_thread(analyze_video, video_path)
         title = result["title"]
         steps_data = result["steps"]
 
+        _update_progress(session, session_manager, "分析完成", SessionStatus.READY)
         session.title = title
         session.platform = platform
         session.steps = [
@@ -53,7 +80,6 @@ async def run_analysis(session: TutorialSession, session_manager):
             )
             for i, s in enumerate(steps_data)
         ]
-        session.status = SessionStatus.READY
 
         elapsed = time.perf_counter() - t_start
         logger.info(
@@ -62,6 +88,7 @@ async def run_analysis(session: TutorialSession, session_manager):
         )
 
     except Exception as e:
+        session.progress = f"失败: {e}"
         session.status = SessionStatus.ERROR
         session.error_message = str(e)
         elapsed = time.perf_counter() - t_start

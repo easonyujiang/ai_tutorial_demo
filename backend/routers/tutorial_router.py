@@ -58,6 +58,7 @@ async def get_status(request: Request, session_id: str):
         total_steps=len(session.steps),
         current_step=session.current_step_index,
         steps=session.steps,
+        progress=session.progress,
     )
 
 

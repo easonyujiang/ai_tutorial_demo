@@ -39,6 +39,7 @@ class TutorialSession(BaseModel):
     status: SessionStatus = SessionStatus.PROCESSING
     created_at: datetime = Field(default_factory=datetime.now)
     error_message: str = ""
+    progress: str = ""
 
 
 class CreateTutorialRequest(BaseModel):
@@ -58,6 +59,7 @@ class SessionStatusResponse(BaseModel):
     total_steps: int
     current_step: int
     steps: list[TutorialStep]
+    progress: str = ""
 
 
 class StepsResponse(BaseModel):

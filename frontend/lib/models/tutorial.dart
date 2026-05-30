@@ -126,6 +126,7 @@ class SessionStatusData {
   final int currentStep;
   final List<TutorialStep> steps;
   final String errorMessage;
+  final String progress;
 
   const SessionStatusData({
     required this.sessionId,
@@ -135,6 +136,7 @@ class SessionStatusData {
     this.currentStep = 0,
     this.steps = const [],
     this.errorMessage = '',
+    this.progress = '',
   });
 
   factory SessionStatusData.fromJson(Map<String, dynamic> json) {
@@ -149,6 +151,7 @@ class SessionStatusData {
               .toList() ??
           const [],
       errorMessage: (json['error_message'] ?? '') as String,
+      progress: (json['progress'] ?? '') as String,
     );
   }
 }
