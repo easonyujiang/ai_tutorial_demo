@@ -77,6 +77,60 @@ class MainActivity : FlutterActivity() {
                         result.success(true)
                     }
 
+                    "takeScreenshot" -> {
+                        val base64 = TutorialOverlayService.takeScreenshot()
+                        if (base64 != null) {
+                            result.success(base64)
+                        } else {
+                            result.error("UNSUPPORTED", "Screenshot requires Android 14+", null)
+                        }
+                    }
+
+                    "findNodeByText" -> {
+                        val targetText = call.argument<String>("targetText") ?: ""
+                        val rect = TutorialAccessibilityService.findNodeByText(targetText)
+                        if (rect != null) {
+                            result.success(mapOf(
+                                "left" to rect.left,
+                                "top" to rect.top,
+                                "right" to rect.right,
+                                "bottom" to rect.bottom,
+                            ))
+                        } else {
+                            result.success(null)
+                        }
+                    }
+
+                    "findNodeByDescription" -> {
+                        val targetDesc = call.argument<String>("targetDesc") ?: ""
+                        val rect = TutorialAccessibilityService.findNodeByDescription(targetDesc)
+                        if (rect != null) {
+                            result.success(mapOf(
+                                "left" to rect.left,
+                                "top" to rect.top,
+                                "right" to rect.right,
+                                "bottom" to rect.bottom,
+                            ))
+                        } else {
+                            result.success(null)
+                        }
+                    }
+
+                    "updateTargetRect" -> {
+                        val left = call.argument<Int>("left") ?: 0
+                        val top = call.argument<Int>("top") ?: 0
+                        val right = call.argument<Int>("right") ?: 0
+                        val bottom = call.argument<Int>("bottom") ?: 0
+                        TutorialOverlayService.updateTargetRect(left, top, right, bottom)
+                        result.success(true)
+                    }
+
+                    "updateInstruction" -> {
+                        val text = call.argument<String>("text") ?: ""
+                        TutorialOverlayService.updateInstruction(text)
+                        result.success(true)
+                    }
+
                     else -> result.notImplemented()
                 }
             }

@@ -1,10 +1,12 @@
 import 'package:flutter/material.dart';
 import 'package:provider/provider.dart';
 
+import '../config.dart';
 import '../controllers/app_ui_controller.dart';
 import '../controllers/voice_controller.dart';
 import '../models/tutorial.dart';
 import '../services/overlay_service.dart';
+import '../services/tutorial_service.dart';
 import 'analysis_page.dart';
 import 'skill_library_page.dart';
 import 'tutorial_screen.dart';
@@ -103,9 +105,10 @@ class _AppShellState extends State<AppShell> with WidgetsBindingObserver {
       await OverlayService.startOverlay(tutorial: tutorial);
 
       if (!mounted) return;
+      final ts = TutorialService(baseUrl: AppConfig.backendUrl);
       await Navigator.of(context).push<bool>(
         MaterialPageRoute(
-          builder: (_) => TutorialScreen(sessionId: sid, tutorial: tutorial),
+          builder: (_) => TutorialScreen(sessionId: sid, tutorial: tutorial, service: ts),
         ),
       );
 

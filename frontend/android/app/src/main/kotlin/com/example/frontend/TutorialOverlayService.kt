@@ -46,6 +46,22 @@ class TutorialOverlayService : Service() {
         fun stop() {
             instance?.stopSelf()
         }
+
+        fun updateTargetRect(left: Int, top: Int, right: Int, bottom: Int) {
+            instance?.handler?.post {
+                instance?.visualOverlay?.updateTargetRect(left, top, right, bottom)
+            }
+        }
+
+        fun updateInstruction(text: String) {
+            instance?.handler?.post {
+                instance?.visualOverlay?.updateInstruction(text)
+            }
+        }
+
+        fun takeScreenshot(): String? {
+            return TutorialAccessibilityService.takeScreenshotBase64()
+        }
     }
 
     private val handler = Handler(Looper.getMainLooper())
@@ -131,8 +147,8 @@ class TutorialOverlayService : Service() {
                 WindowManager.LayoutParams.FLAG_NOT_TOUCH_MODAL,
             PixelFormat.TRANSLUCENT
         )
-        params.gravity = Gravity.TOP or Gravity.CENTER_HORIZONTAL
-        params.y = ((screenH * 0.50).toInt())
+        params.gravity = Gravity.BOTTOM or Gravity.CENTER_HORIZONTAL
+        params.y = (40 * dp).toInt()
         windowManager!!.addView(navButtonView, params)
     }
 
@@ -282,6 +298,7 @@ class VisualOverlayView(
     private var completeRect = RectF()
     private var externStepPending = false
     private var stepsJsonOriginal = stepsJson
+    private var hasValidTarget = false
 
     init { parseSteps(stepsJson) }
 
@@ -304,7 +321,6 @@ class VisualOverlayView(
                 ))
             }
         } catch (_: Exception) {}
-        if (steps.isNotEmpty()) updateTargetRect()
     }
 
     fun advanceStep() {
@@ -312,11 +328,25 @@ class VisualOverlayView(
             onAllStepsDone?.invoke()
             return
         }
-        currentIndex++; externStepPending = false; updateTargetRect()
+        currentIndex++; externStepPending = false; hasValidTarget = false; updateTargetRect()
     }
 
     private val handler = Handler(Looper.getMainLooper())
     private val resetExternPending = Runnable { externStepPending = false }
+
+    fun updateTargetRect(left: Int, top: Int, right: Int, bottom: Int) {
+        hasValidTarget = true
+        targetRect = RectF(left.toFloat(), top.toFloat(), right.toFloat(), bottom.toFloat())
+        invalidate()
+    }
+
+    fun updateInstruction(text: String) {
+        if (currentIndex < steps.size) {
+            steps[currentIndex] = steps[currentIndex].toMutableMap().apply {
+                put("instruction", text)
+            }
+        }
+    }
 
     fun advanceStepExternally() {
         if (showComplete) {
@@ -325,7 +355,7 @@ class VisualOverlayView(
         }
         if (externStepPending) return
         externStepPending = true
-        currentIndex++; updateTargetRect()
+        currentIndex++; hasValidTarget = false; updateTargetRect()
         handler.removeCallbacks(resetExternPending)
         handler.postDelayed(resetExternPending, 500)
     }
@@ -361,7 +391,28 @@ class VisualOverlayView(
             canvas.drawText("点击下方按钮退出", completeRect.centerX(), completeRect.centerY() + 30f, backHintPaint)
             return
         }
-        if (steps.isEmpty()) return
+        if (steps.isEmpty() || currentIndex >= steps.size) return
+
+        val step = steps[currentIndex]
+        val instruction = step["instruction"] as? String ?: ""
+
+        if (!hasValidTarget) {
+            canvas.drawColor(Color.parseColor("#80000000"))
+            val dp = resources.displayMetrics.density
+            val instPaint = Paint().apply {
+                color = Color.WHITE; textSize = 32f * dp; isAntiAlias = true
+                textAlign = Align.CENTER; typeface = Typeface.DEFAULT_BOLD
+                setShadowLayer(8f, 0f, 2f, Color.parseColor("#80000000"))
+            }
+            val lines = wrapText(instruction, instPaint, screenWidth * 0.85f)
+            val lh = instPaint.fontSpacing * 1.2f
+            val startY = screenHeight / 2f - (lines.size * lh) / 2f
+            for ((i, line) in lines.withIndex()) {
+                canvas.drawText(line, screenWidth / 2f, startY + kotlin.math.abs(instPaint.fontMetrics.ascent) + i * lh, instPaint)
+            }
+            return
+        }
+
         val r = targetRect
         if (r.left > 0) canvas.drawRect(0f, 0f, r.left, screenHeight.toFloat(), maskPaint)
         if (r.right < screenWidth) canvas.drawRect(r.right, 0f, screenWidth.toFloat(), screenHeight.toFloat(), maskPaint)
