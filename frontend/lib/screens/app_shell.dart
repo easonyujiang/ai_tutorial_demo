@@ -86,7 +86,15 @@ class _AppShellState extends State<AppShell> with WidgetsBindingObserver {
             ],
           ),
         );
-        if (ok == true) await OverlayService.openAccessibilitySettings();
+        if (ok == true) {
+          await OverlayService.openAccessibilitySettings();
+          if (mounted) {
+            ScaffoldMessenger.of(context).showSnackBar(
+              const SnackBar(content: Text('请在设置中开启无障碍服务后，重新点击技能')),
+            );
+          }
+          return;
+        }
       }
 
       if (!mounted) return;

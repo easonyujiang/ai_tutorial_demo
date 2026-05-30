@@ -72,6 +72,8 @@ class OverlayService {
         'steps': stepsJson,
         'title': tutorial.title,
         'id': tutorial.id,
+        'targetPackage': tutorial.launchPackage,
+        'targetActivity': tutorial.launchActivity,
       });
     } on MissingPluginException {
       // no-op
