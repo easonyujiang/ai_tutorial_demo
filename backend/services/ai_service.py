@@ -7,7 +7,6 @@ import tempfile
 from openai import OpenAI
 
 from config import settings
-from models.tutorial import TutorialStep
 from infrastructure.logger import get_logger
 
 logger = get_logger(__name__)
@@ -45,6 +44,45 @@ COMPRESS_FPS = 8
 COMPRESS_CRF = 28
 COMPRESS_PRESET = "fast"
 EXTRACT_FRAME_HEIGHT = 1080
+
+
+def _is_placeholder_api_key(api_key: str) -> bool:
+    k = (api_key or "").strip().lower()
+    if not k:
+        return True
+    return "your-api-key" in k or k == "sk-your-api-key-here"
+
+
+def _demo_analysis(reason: str = "") -> dict:
+    suffix = f"（演示模式：{reason}）" if reason else "（演示模式）"
+    return {
+        "title": f"示例教程{suffix}",
+        "app_name": "",
+        "app_package": "",
+        "steps": [
+            {
+                "instruction": "打开目标应用或回到需要操作的页面",
+                "target_text": "",
+                "target_type": "icon",
+                "target_description": "无（演示步骤）",
+                "page_description": "任意页面",
+            },
+            {
+                "instruction": "按照教程提示找到对应按钮并点击",
+                "target_text": "",
+                "target_type": "icon",
+                "target_description": "无（演示步骤）",
+                "page_description": "任意页面",
+            },
+            {
+                "instruction": "完成操作后返回本应用继续下一步",
+                "target_text": "",
+                "target_type": "icon",
+                "target_description": "无（演示步骤）",
+                "page_description": "任意页面",
+            },
+        ],
+    }
 
 
 def _get_video_duration(input_path: str) -> float:
@@ -152,8 +190,9 @@ def analyze_video(video_path: str) -> dict:
     base_url = settings.openai_base_url or os.getenv("OPENAI_BASE_URL")
     model = settings.openai_model or os.getenv("OPENAI_MODEL", "gpt-4o")
 
-    if not api_key:
-        raise RuntimeError("OPENAI_API_KEY 环境变量未设置")
+    if _is_placeholder_api_key(api_key):
+        logger.warning("OPENAI_API_KEY 未配置或为占位符，启用演示分析")
+        return _demo_analysis("未配置模型 API Key")
     if not base_url:
         raise RuntimeError("OPENAI_BASE_URL 环境变量未设置")
 
@@ -205,7 +244,7 @@ def analyze_video(video_path: str) -> dict:
         )
     except Exception as e:
         logger.error("API call failed: %s", e)
-        raise RuntimeError(f"API 调用失败：{e}")
+        return _demo_analysis(f"模型请求失败：{e}")
 
     if response.usage:
         logger.info(
