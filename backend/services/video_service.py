@@ -126,7 +126,7 @@ def download_video(url: str, session_id: str) -> str:
     except Exception as e:
         import shutil
         shutil.rmtree(download_dir, ignore_errors=True)
-        logger.error("Video download failed: %s", e)
+        logger.warning("Video download failed: %s", e)
         raise RuntimeError(f"视频下载失败：{e}")
 
     if not os.path.exists(output_path) or os.path.getsize(output_path) == 0:

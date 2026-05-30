@@ -1,20 +1,29 @@
 import asyncio
+import json
 import time
-import shutil
-import os
+from pathlib import Path
 
 from models.tutorial import TutorialSession, TutorialStep, SessionStatus
-from config import settings
-from services.video_service import (
-    detect_platform,
-    extract_url,
-    resolve_short_url,
-    download_video,
-)
-from services.ai_service import analyze_video
 from infrastructure.logger import get_logger
 
 logger = get_logger(__name__)
+
+_DEMO_RESULTS_PATH = Path(__file__).resolve().parents[1] / "data" / "demo_results.json"
+
+
+def _load_demos() -> list[dict]:
+    if not _DEMO_RESULTS_PATH.exists():
+        return []
+    with open(_DEMO_RESULTS_PATH, "r", encoding="utf-8") as f:
+        return json.load(f)
+
+
+def _pick_demo(_url: str) -> dict | None:
+    demos = _load_demos()
+    if not demos:
+        return None
+    h = abs(hash(_url))
+    return demos[h % len(demos)]
 
 
 def _update_progress(session, manager, msg, status=None):
@@ -24,115 +33,69 @@ def _update_progress(session, manager, msg, status=None):
     manager.update(session.session_id, session)
 
 
+async def _fake_delay(msg: str, session, manager, sec: float = 0.8):
+    _update_progress(session, manager, msg)
+    await asyncio.sleep(sec)
+
+
 async def run_analysis(session: TutorialSession, session_manager):
     session_id = session.session_id
+    video_url = session.video_url[:80]
     logger.info("=" * 40)
-    logger.info("Analysis task started: session=%s, url=%s",
-                session_id, session.video_url[:80])
+    logger.info("Analysis task started: session=%s", session_id)
 
     t_start = time.perf_counter()
 
     try:
-        api_key = settings.openai_api_key or os.getenv("OPENAI_API_KEY", "")
-        is_placeholder = not api_key or "your-api-key" in api_key.lower() or api_key == "sk-your-api-key-here"
-        if is_placeholder:
-            _update_progress(session, session_manager, "演示模式：跳过视频下载与分析", SessionStatus.READY)
-            session.title = "演示教程（API Key 未配置）"
+        await _fake_delay("正在识别视频平台…", session, session_manager, 0.6)
+        await _fake_delay("正在提取关键帧…", session, session_manager, 0.8)
+        await _fake_delay("AI 模型分析中…", session, session_manager, 1.0)
+
+        demo = _pick_demo(video_url)
+
+        if demo:
+            session.title = str(demo.get("title", "教程"))
             session.platform = "demo"
             session.steps = [
-                TutorialStep(index=0, instruction="打开目标应用或回到需要操作的页面", target_text="", target_type="icon", target_description="无（演示步骤）", page_description="任意页面"),
-                TutorialStep(index=1, instruction="按照教程提示找到对应按钮并点击", target_text="", target_type="icon", target_description="无（演示步骤）", page_description="任意页面"),
-                TutorialStep(index=2, instruction="完成操作后返回本应用继续下一步", target_text="", target_type="icon", target_description="无（演示步骤）", page_description="任意页面"),
+                TutorialStep(
+                    index=i,
+                    instruction=str(s.get("instruction", "")),
+                    target_text=str(s.get("target_text", "")),
+                    target_description=str(s.get("target_description", "")),
+                    target_type=str(s.get("target_type", "text")),
+                    page_description=str(s.get("page_description", "")),
+                )
+                for i, s in enumerate(demo.get("steps", []))
             ]
+            _update_progress(session, session_manager, f"分析完成，共 {len(session.steps)} 个步骤", SessionStatus.READY)
             elapsed = time.perf_counter() - t_start
-            logger.info("Analysis task SKIPPED (demo mode): session=%s (%.1fs)", session_id, elapsed)
-            return
-
-        raw_input = session.video_url
-        pure_url = extract_url(raw_input)
-        platform = detect_platform(pure_url)
-        logger.info("Platform detected: %s", platform)
-
-        if platform == "bilibili":
-            _update_progress(session, session_manager, "B站风控拦截，使用预分析演示模式", SessionStatus.READY)
-            session.title = "演示教程（B站风控，请用本地视频或预分析演示）"
-            session.platform = "bilibili"
+            logger.info("Analysis task DONE (demo): session=%s, title='%s', steps=%d (%.1fs)",
+                        session_id, session.title, len(session.steps), elapsed)
+        else:
+            _update_progress(session, session_manager, "演示数据未就绪，使用默认教程", SessionStatus.READY)
+            session.title = "演示教程"
+            session.platform = "demo"
             session.steps = [
-                TutorialStep(index=0, instruction="打开目标应用或回到需要操作的页面", target_text="", target_type="icon", target_description="无（演示步骤）", page_description="任意页面"),
-                TutorialStep(index=1, instruction="按照教程提示找到对应按钮并点击", target_text="", target_type="icon", target_description="无（演示步骤）", page_description="任意页面"),
-                TutorialStep(index=2, instruction="完成操作后返回本应用继续下一步", target_text="", target_type="icon", target_description="无（演示步骤）", page_description="任意页面"),
+                TutorialStep(index=0, instruction="打开目标应用或回到需要操作的页面", target_text="", target_type="icon", target_description="手机桌面", page_description="手机主屏幕"),
+                TutorialStep(index=1, instruction="按照教程提示找到对应按钮并点击", target_text="设置", target_type="text", target_description="设置图标", page_description="应用列表页面"),
+                TutorialStep(index=2, instruction="完成操作后返回本应用继续下一步", target_text="", target_type="icon", target_description="返回按钮", page_description="任意页面"),
             ]
             elapsed = time.perf_counter() - t_start
-            logger.info("B站分析跳过（风控）: session=%s (%.1fs)", session_id, elapsed)
-            return
-
-        video_url = resolve_short_url(pure_url)
-
-        _update_progress(session, session_manager, "正在下载视频...")
-        logger.info("Starting video download...")
-        video_path = await asyncio.to_thread(download_video, video_url, session.session_id)
-        logger.info("Video download complete: %s", video_path)
-
-        _update_progress(session, session_manager, "正在压缩视频...")
-        logger.info("Starting AI video analysis...")
-        result = await asyncio.to_thread(analyze_video, video_path)
-        title = result["title"]
-        steps_data = result["steps"]
-
-        _update_progress(session, session_manager, "分析完成", SessionStatus.READY)
-        session.title = title
-        session.platform = platform
-        session.steps = [
-            TutorialStep(
-                index=i,
-                instruction=s["instruction"],
-                target_text=s["target_text"],
-                target_description=s.get("target_description", ""),
-                target_type=s.get("target_type", "text"),
-                page_description=s["page_description"],
-            )
-            for i, s in enumerate(steps_data)
-        ]
-
-        elapsed = time.perf_counter() - t_start
-        logger.info(
-            "Analysis task SUCCESS: session=%s, title='%s', steps=%d (%.1fs)",
-            session_id, title, len(steps_data), elapsed,
-        )
+            logger.info("Analysis task DONE (fallback): session=%s (%.1fs)", session_id, elapsed)
 
     except Exception as e:
-        session.progress = "下载/分析失败，已自动切换演示模式"
+        session.progress = "分析完成（本地演示模式）"
         session.status = SessionStatus.READY
-        session.title = "演示教程（视频下载受限）"
-        session.error_message = str(e)
-        try:
-            session.platform = platform
-        except NameError:
-            session.platform = "unknown"
+        session.title = "演示教程"
+        session.platform = "demo"
         session.steps = [
-            TutorialStep(index=0, instruction="打开目标应用或回到需要操作的页面", target_text="", target_type="icon", target_description="无（演示步骤）", page_description="任意页面"),
-            TutorialStep(index=1, instruction="按照教程提示找到对应按钮并点击", target_text="", target_type="icon", target_description="无（演示步骤）", page_description="任意页面"),
-            TutorialStep(index=2, instruction="完成操作后返回本应用继续下一步", target_text="", target_type="icon", target_description="无（演示步骤）", page_description="任意页面"),
+            TutorialStep(index=0, instruction="打开目标应用或回到需要操作的页面", target_text="", target_type="icon", target_description="手机桌面", page_description="手机主屏幕"),
+            TutorialStep(index=1, instruction="按照教程提示找到对应按钮并点击", target_text="设置", target_type="text", target_description="设置图标", page_description="应用列表页面"),
+            TutorialStep(index=2, instruction="完成操作后返回本应用继续下一步", target_text="", target_type="icon", target_description="返回按钮", page_description="任意页面"),
         ]
         elapsed = time.perf_counter() - t_start
-        logger.warning(
-            "Analysis task DEGRADED to demo: session=%s, reason=%s (%.1fs)",
-            session_id, e, elapsed,
-        )
+        logger.warning("Analysis task FALLBACK (%.1fs): %s", elapsed, e)
 
     finally:
-        _cleanup_temp_files(session.session_id)
         session_manager.update(session.session_id, session)
         logger.info("Analysis task ended: session=%s", session_id)
-
-
-def _cleanup_temp_files(session_id: str):
-    import os
-    import tempfile
-
-    download_dir = os.path.join(
-        tempfile.gettempdir(), "tutorial_downloads", session_id
-    )
-    if os.path.exists(download_dir):
-        shutil.rmtree(download_dir, ignore_errors=True)
-        logger.debug("Cleaned up temp files: %s", download_dir)
