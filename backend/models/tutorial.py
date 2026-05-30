@@ -1,4 +1,7 @@
-from pydantic import BaseModel
+from pydantic import BaseModel, Field
+from enum import Enum
+from datetime import datetime
+
 
 class RectModel(BaseModel):
     left: float
@@ -6,13 +9,82 @@ class RectModel(BaseModel):
     width: float
     height: float
 
-class StepModel(BaseModel):
-    image: str = ""
-    instruction: str
-    rect: RectModel
-    bubble_dir: str = "top"  # top, bottom, left, right
 
-class TutorialResponse(BaseModel):
-    id: str
+class TutorialStep(BaseModel):
+    index: int
+    instruction: str
+    target_text: str
+    page_description: str = ""
+    status: str = "pending"
+    completed_at: datetime | None = None
+
+
+class SessionStatus(str, Enum):
+    PROCESSING = "processing"
+    READY = "ready"
+    IN_PROGRESS = "in_progress"
+    COMPLETED = "completed"
+    ERROR = "error"
+
+
+class TutorialSession(BaseModel):
+    session_id: str = ""
+    title: str = ""
+    platform: str = ""
+    video_url: str = ""
+    steps: list[TutorialStep] = []
+    current_step_index: int = 0
+    status: SessionStatus = SessionStatus.PROCESSING
+    created_at: datetime = Field(default_factory=datetime.now)
+    error_message: str = ""
+
+
+class CreateTutorialRequest(BaseModel):
+    url: str
+
+
+class CreateTutorialResponse(BaseModel):
+    session_id: str
+    status: str
+    message: str
+
+
+class SessionStatusResponse(BaseModel):
+    session_id: str
+    status: str
     title: str
-    steps: list[StepModel]
+    total_steps: int
+    current_step: int
+    steps: list[TutorialStep]
+
+
+class StepsResponse(BaseModel):
+    session_id: str
+    title: str
+    steps: list[TutorialStep]
+
+
+class ExecuteResponse(BaseModel):
+    completed: bool
+    step_index: int = -1
+    total_steps: int = 0
+    instruction: str = ""
+    target_text: str = ""
+    page_description: str = ""
+
+
+class ScreenshotRequest(BaseModel):
+    step_index: int
+    image_base64: str
+    screen_width: int = 0
+    screen_height: int = 0
+
+
+class StepActionRequest(BaseModel):
+    step_index: int
+    reason: str = ""
+
+
+class StepActionResponse(BaseModel):
+    ok: bool
+    next_step: int = -1
