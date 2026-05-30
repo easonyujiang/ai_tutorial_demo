@@ -90,8 +90,8 @@ class TutorialOverlayService : Service() {
     private fun addVisualOverlay(json: String) {
         savedStepsJson = json
         visualOverlay = VisualOverlayView(this, json, screenW, screenH)
-        visualOverlay!!.onStepChanged = { hasMore ->
-            navButtonView?.updateState(hasMore)
+        visualOverlay!!.onStepChanged = { index, total ->
+            navButtonView?.updateState(index, total)
         }
         visualOverlay!!.onAllStepsDone = {
             stopSelf()
@@ -113,7 +113,6 @@ class TutorialOverlayService : Service() {
         params.gravity = Gravity.TOP or Gravity.START
         windowManager!!.addView(visualOverlay, params)
         addNavButton()
-        navButtonView?.updateState(true)
     }
 
     private fun addNavButton() {
@@ -236,7 +235,7 @@ class VisualOverlayView(
     screenH: Int
 ) : View(context) {
 
-    var onStepChanged: ((hasMore: Boolean) -> Unit)? = null
+    var onStepChanged: ((stepIndex: Int, stepTotal: Int) -> Unit)? = null
     var onAllStepsDone: (() -> Unit)? = null
 
     private val maskPaint = Paint().apply {
@@ -339,7 +338,7 @@ class VisualOverlayView(
                 (screenWidth - cw) / 2f, (screenHeight - ch) / 2f,
                 (screenWidth + cw) / 2f, (screenHeight + ch) / 2f
             )
-            onStepChanged?.invoke(false); invalidate(); return
+            onStepChanged?.invoke(steps.size, steps.size); invalidate(); return
         }
         showComplete = false
         val step = steps[currentIndex]
@@ -349,7 +348,7 @@ class VisualOverlayView(
             ((step["left"] as Double) + (step["width"] as Double)).toFloat() * screenWidth,
             ((step["top"] as Double) + (step["height"] as Double)).toFloat() * screenHeight
         )
-        onStepChanged?.invoke(true); invalidate()
+        onStepChanged?.invoke(currentIndex + 1, steps.size); invalidate()
     }
 
     override fun onDraw(canvas: Canvas) {
@@ -524,10 +523,14 @@ class NavButtonView(context: Context, private val onClick: () -> Unit) : View(co
         isAntiAlias = true; textAlign = Align.CENTER; typeface = Typeface.DEFAULT_BOLD
         setShadowLayer(4f, 0f, 2f, Color.parseColor("#80000000"))
     }
-    private var label = "下一步 ▶"
+    private var label = "1/1 下一步 ▶"
     init { isClickable = true }
-    fun updateState(hasMore: Boolean) {
-        label = if (hasMore) "下一步 ▶" else "退出教程"
+    fun updateState(stepIndex: Int, stepTotal: Int) {
+        label = if (stepIndex >= stepTotal) {
+            "完成 ✓"
+        } else {
+            "$stepIndex/$stepTotal 下一步 ▶"
+        }
         requestLayout(); invalidate()
     }
     override fun onMeasure(wms: Int, hms: Int) {

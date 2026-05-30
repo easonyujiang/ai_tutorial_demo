@@ -11,8 +11,17 @@ class LoadingScreen extends StatefulWidget {
 class _LoadingScreenState extends State<LoadingScreen>
     with SingleTickerProviderStateMixin {
   double _progress = 0;
+  String _stageText = '正在解析视频链接...';
+  int _stageIndex = 0;
   late AnimationController _pulseCtrl;
   Timer? _timer;
+
+  static const _stages = [
+    _Stage(label: '正在解析视频链接...', progress: 0.20),
+    _Stage(label: '正在下载视频...', progress: 0.45),
+    _Stage(label: 'AI 正在分析操作步骤...', progress: 0.80),
+    _Stage(label: '正在生成引导层...', progress: 1.0),
+  ];
 
   @override
   void initState() {
@@ -21,20 +30,32 @@ class _LoadingScreenState extends State<LoadingScreen>
       vsync: this,
       duration: const Duration(milliseconds: 1200),
     )..repeat(reverse: true);
-    _startSimulatedProgress();
+    _startStagedProgress();
   }
 
-  void _startSimulatedProgress() {
-    _timer = Timer.periodic(const Duration(milliseconds: 80), (timer) {
+  void _startStagedProgress() {
+    final tickMs = 120;
+    _timer = Timer.periodic(Duration(milliseconds: tickMs), (timer) {
       if (!mounted) { timer.cancel(); return; }
+
+      final currentStage = _stages[_stageIndex];
+      final incr = currentStage.progress / (currentStage.progress * 1000 / tickMs).clamp(1, 100);
+
       setState(() {
-        _progress += 0.015;
-        if (_progress >= 1.0) {
-          _progress = 1.0;
-          timer.cancel();
-          if (mounted) {
-            Navigator.of(context).pop(true);
+        _progress += incr;
+        if (_progress >= currentStage.progress) {
+          _progress = currentStage.progress;
+          _stageIndex++;
+          if (_stageIndex >= _stages.length) {
+            _progress = 1.0;
+            _stageText = _stages.last.label;
+            timer.cancel();
+            Future<void>.delayed(const Duration(milliseconds: 400), () {
+              if (mounted) Navigator.of(context).pop(true);
+            });
+            return;
           }
+          _stageText = _stages[_stageIndex].label;
         }
       });
     });
@@ -74,13 +95,17 @@ class _LoadingScreenState extends State<LoadingScreen>
                     ),
                   ),
                   const SizedBox(height: 40),
-                  const Text(
-                    '正在生成教程步骤...',
-                    textScaleFactor: 1.0,
-                    style: TextStyle(
-                      color: Colors.white,
-                      fontSize: 24,
-                      fontWeight: FontWeight.w700,
+                  AnimatedSwitcher(
+                    duration: const Duration(milliseconds: 400),
+                    child: Text(
+                      _stageText,
+                      key: ValueKey(_stageText),
+                      textScaleFactor: 1.0,
+                      style: const TextStyle(
+                        color: Colors.white,
+                        fontSize: 24,
+                        fontWeight: FontWeight.w700,
+                      ),
                     ),
                   ),
                   const SizedBox(height: 32),
@@ -99,13 +124,17 @@ class _LoadingScreenState extends State<LoadingScreen>
                     ),
                   ),
                   const SizedBox(height: 16),
-                  Text(
-                    '${(_progress * 100).toInt()}%',
-                    textScaleFactor: 1.0,
-                    style: const TextStyle(
-                      color: Colors.white,
-                      fontSize: 48,
-                      fontWeight: FontWeight.w800,
+                  AnimatedSwitcher(
+                    duration: const Duration(milliseconds: 300),
+                    child: Text(
+                      '${(_progress * 100).toInt()}%',
+                      key: ValueKey((_progress * 100).toInt()),
+                      textScaleFactor: 1.0,
+                      style: const TextStyle(
+                        color: Colors.white,
+                        fontSize: 48,
+                        fontWeight: FontWeight.w800,
+                      ),
                     ),
                   ),
                 ],
@@ -116,4 +145,10 @@ class _LoadingScreenState extends State<LoadingScreen>
       ),
     );
   }
+}
+
+class _Stage {
+  final String label;
+  final double progress;
+  const _Stage({required this.label, required this.progress});
 }
