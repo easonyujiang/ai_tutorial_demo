@@ -127,7 +127,7 @@ class MockTutorialService extends TutorialService {
   }
 
   @override
-  Future<bool> waitForReady(String sessionId, {int intervalMs = 2000}) async {
+  Future<bool> waitForReady(String sessionId, {int intervalMs = 2000, int maxRetries = 150}) async {
     await Future.delayed(const Duration(seconds: 2));
     return true;
   }
