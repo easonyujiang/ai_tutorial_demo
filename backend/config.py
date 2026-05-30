@@ -14,6 +14,8 @@ class Settings(BaseSettings):
     max_video_size_mb: int = 500
     video_download_timeout: int = 120
 
+    rate_limit: str = "60/minute"
+
     class Config:
         env_file = ".env"
         env_prefix = ""

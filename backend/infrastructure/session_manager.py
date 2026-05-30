@@ -3,16 +3,18 @@ import uuid
 from threading import Lock
 
 from models.tutorial import TutorialSession
+from config import settings
 from infrastructure.logger import get_logger
 
 logger = get_logger(__name__)
 
 
 class SessionManager:
-    def __init__(self):
+    def __init__(self, ttl_seconds: int | None = None):
         self._sessions: dict[str, TutorialSession] = {}
         self._created_at: dict[str, float] = {}
         self._lock = Lock()
+        self._ttl_seconds = ttl_seconds if ttl_seconds is not None else settings.session_ttl_seconds
 
     def create(self, session: TutorialSession) -> str:
         if not session.session_id:
@@ -46,12 +48,13 @@ class SessionManager:
         logger.info("Session deleted: %s (remaining: %d)",
                      session_id, len(self._sessions))
 
-    def _cleanup_expired(self, ttl_seconds: int = 1800):
+    def _cleanup_expired(self):
+        ttl = self._ttl_seconds
         now = time.time()
         with self._lock:
             expired = [
                 sid for sid, ts in self._created_at.items()
-                if now - ts > ttl_seconds
+                if now - ts > ttl
             ]
             for sid in expired:
                 self._sessions.pop(sid, None)

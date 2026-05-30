@@ -1,5 +1,6 @@
 import base64
 import io
+import threading
 
 import easyocr
 import numpy as np
@@ -13,15 +14,18 @@ from models.tutorial import RectModel
 logger = get_logger(__name__)
 
 _reader: easyocr.Reader | None = None
+_reader_lock = threading.Lock()
 
 
 def _get_reader() -> easyocr.Reader:
     global _reader
     if _reader is None:
-        lang = settings.ocr_lang or "ch_sim"
-        logger.info("Initializing EasyOCR (lang=%s, gpu=False)...", lang)
-        _reader = easyocr.Reader([lang, "en"], gpu=False)
-        logger.info("EasyOCR initialized")
+        with _reader_lock:
+            if _reader is None:
+                lang = settings.ocr_lang or "ch_sim"
+                logger.info("Initializing EasyOCR (lang=%s, gpu=False)...", lang)
+                _reader = easyocr.Reader([lang, "en"], gpu=False)
+                logger.info("EasyOCR initialized")
     return _reader
 
 

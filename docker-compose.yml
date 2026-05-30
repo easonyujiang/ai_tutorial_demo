@@ -8,6 +8,23 @@ services:
       - "8000:8000"
     env_file:
       - ./backend/.env
+    environment:
+      - PYTHONUNBUFFERED=1
     volumes:
-      - ./backend:/app
+      - ./backend/main.py:/app/main.py
+      - ./backend/config.py:/app/config.py
+      - ./backend/models:/app/models
+      - ./backend/routers:/app/routers
+      - ./backend/services:/app/services
+      - ./backend/infrastructure:/app/infrastructure
+      - easyocr_models:/root/.EasyOCR/model
     restart: unless-stopped
+    healthcheck:
+      test: ["CMD", "python", "-c", "from urllib.request import urlopen; urlopen('http://localhost:8000/')"]
+      interval: 30s
+      timeout: 10s
+      retries: 3
+      start_period: 60s
+
+volumes:
+  easyocr_models:

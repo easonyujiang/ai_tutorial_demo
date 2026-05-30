@@ -4,14 +4,20 @@ from contextlib import asynccontextmanager
 from dotenv import load_dotenv
 from fastapi import FastAPI, Request
 from fastapi.middleware.cors import CORSMiddleware
+from slowapi import Limiter, _rate_limit_exceeded_handler
+from slowapi.util import get_remote_address
+from slowapi.errors import RateLimitExceeded
 
 from infrastructure.logger import setup_logging, get_logger
 from infrastructure.session_manager import SessionManager
+from config import settings
 from routers import tutorial_router
 
 load_dotenv()
 
 logger = get_logger(__name__)
+
+limiter = Limiter(key_func=get_remote_address, default_limits=[settings.rate_limit])
 
 
 @asynccontextmanager
@@ -31,6 +37,9 @@ app = FastAPI(
     version="2.0.0",
     lifespan=lifespan,
 )
+
+app.state.limiter = limiter
+app.add_exception_handler(RateLimitExceeded, _rate_limit_exceeded_handler)
 
 app.add_middleware(
     CORSMiddleware,

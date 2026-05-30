@@ -1,30 +1,58 @@
+import 'dart:async';
 import 'dart:convert';
 import 'package:http/http.dart' as http;
 import '../models/tutorial.dart';
 
+class ApiException implements Exception {
+  final int statusCode;
+  final String message;
+  const ApiException(this.statusCode, this.message);
+  @override
+  String toString() => 'ApiException($statusCode): $message';
+}
+
 class TutorialService {
   final String baseUrl;
+  final Duration timeout;
 
-  const TutorialService({required this.baseUrl});
+  const TutorialService({required this.baseUrl, this.timeout = const Duration(seconds: 30)});
 
   Future<Map<String, dynamic>> _post(String path, {Map<String, dynamic>? body}) async {
     final uri = Uri.parse('$baseUrl$path');
-    final response = body != null
-        ? await http.post(uri, headers: {'Content-Type': 'application/json'}, body: jsonEncode(body))
-        : await http.post(uri, headers: {'Content-Type': 'application/json'});
-    if (response.statusCode < 200 || response.statusCode >= 300) {
-      throw Exception('API error (${response.statusCode}): ${response.body}');
+    try {
+      final response = body != null
+          ? await http.post(uri, headers: {'Content-Type': 'application/json'}, body: jsonEncode(body))
+              .timeout(timeout)
+          : await http.post(uri, headers: {'Content-Type': 'application/json'}).timeout(timeout);
+      if (response.statusCode < 200 || response.statusCode >= 300) {
+        throw ApiException(response.statusCode, _extractMessage(response.body));
+      }
+      return jsonDecode(response.body) as Map<String, dynamic>;
+    } on TimeoutException {
+      throw ApiException(408, '请求超时，请检查网络连接');
     }
-    return jsonDecode(response.body) as Map<String, dynamic>;
   }
 
   Future<Map<String, dynamic>> _get(String path) async {
     final uri = Uri.parse('$baseUrl$path');
-    final response = await http.get(uri, headers: {'Content-Type': 'application/json'});
-    if (response.statusCode < 200 || response.statusCode >= 300) {
-      throw Exception('API error (${response.statusCode}): ${response.body}');
+    try {
+      final response = await http.get(uri, headers: {'Content-Type': 'application/json'}).timeout(timeout);
+      if (response.statusCode < 200 || response.statusCode >= 300) {
+        throw ApiException(response.statusCode, _extractMessage(response.body));
+      }
+      return jsonDecode(response.body) as Map<String, dynamic>;
+    } on TimeoutException {
+      throw ApiException(408, '请求超时，请检查网络连接');
     }
-    return jsonDecode(response.body) as Map<String, dynamic>;
+  }
+
+  String _extractMessage(String body) {
+    try {
+      final json = jsonDecode(body);
+      return json['detail'] ?? json['message'] ?? body;
+    } catch (_) {
+      return body;
+    }
   }
 
   Future<String> createSession(String videoUrl) async {
@@ -37,13 +65,16 @@ class TutorialService {
     return SessionStatusData.fromJson(data);
   }
 
-  Future<bool> waitForReady(String sessionId, {int intervalMs = 2000}) async {
-    while (true) {
+  Future<bool> waitForReady(String sessionId, {int intervalMs = 2000, int maxRetries = 150}) async {
+    for (int i = 0; i < maxRetries; i++) {
       final status = await getStatus(sessionId);
       if (status.status == 'ready') return true;
-      if (status.status == 'error') throw Exception(status.errorMessage.isNotEmpty ? status.errorMessage : '分析失败');
+      if (status.status == 'error') {
+        throw ApiException(500, status.errorMessage.isNotEmpty ? status.errorMessage : '分析失败');
+      }
       await Future.delayed(Duration(milliseconds: intervalMs));
     }
+    throw ApiException(408, '教程分析超时，请稍后重试');
   }
 
   Future<ExecuteData> executeStep(String sessionId) async {
@@ -73,11 +104,15 @@ class TutorialService {
 
   Future<Map<String, dynamic>> cancelSession(String sessionId) async {
     final uri = Uri.parse('$baseUrl/api/v1/tutorial/$sessionId');
-    final response = await http.delete(uri);
-    if (response.statusCode < 200 || response.statusCode >= 300) {
-      throw Exception('API error (${response.statusCode}): ${response.body}');
+    try {
+      final response = await http.delete(uri).timeout(timeout);
+      if (response.statusCode < 200 || response.statusCode >= 300) {
+        throw ApiException(response.statusCode, _extractMessage(response.body));
+      }
+      return jsonDecode(response.body) as Map<String, dynamic>;
+    } on TimeoutException {
+      throw ApiException(408, '请求超时，请检查网络连接');
     }
-    return jsonDecode(response.body) as Map<String, dynamic>;
   }
 }
 
