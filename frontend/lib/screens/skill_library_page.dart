@@ -36,9 +36,12 @@ class _SkillLibraryPageState extends State<SkillLibraryPage> {
   }
 
   void _startSkill(Map<String, dynamic> skillData) {
-    final steps = (skillData['steps'] as List? ?? []).map<TutorialStep>((s) {
+    final rawSteps = skillData['steps'] as List? ?? [];
+    final steps = rawSteps.asMap().entries.map<TutorialStep>((entry) {
+      final idx = entry.key;
+      final s = entry.value as Map<String, dynamic>;
       return TutorialStep(
-        index: s['index'] as int? ?? 0,
+        index: idx,
         instruction: (s['instruction'] ?? '') as String,
         targetText: (s['target_text'] ?? '') as String,
         targetDescription: (s['target_description'] ?? '') as String,

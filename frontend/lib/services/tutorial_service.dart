@@ -47,6 +47,21 @@ class TutorialService {
     }
   }
 
+  Future<List<dynamic>> _getList(String path) async {
+    final uri = Uri.parse('$baseUrl$path');
+    try {
+      final response = await http.get(uri, headers: {'Content-Type': 'application/json'}).timeout(timeout);
+      if (response.statusCode < 200 || response.statusCode >= 300) {
+        throw ApiException(response.statusCode, _extractMessage(response.body));
+      }
+      final decoded = jsonDecode(response.body);
+      if (decoded is List) return decoded;
+      throw ApiException(500, '接口返回格式错误：期望数组');
+    } on TimeoutException {
+      throw ApiException(408, '请求超时，请检查网络连接');
+    }
+  }
+
   String _extractMessage(String body) {
     try {
       final data = jsonDecode(body);
@@ -117,7 +132,8 @@ class TutorialService {
   }
 
   Future<List<Map<String, dynamic>>> fetchSkills() async {
-    return List<Map<String, dynamic>>.from(await _get('/api/skills') as List);
+    final raw = await _getList('/api/skills');
+    return raw.map((e) => e as Map<String, dynamic>).toList();
   }
 
   Future<Map<String, dynamic>> createSkill(Map<String, dynamic> body) async {
