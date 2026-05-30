@@ -3,6 +3,7 @@ import 'package:flutter/material.dart';
 import '../config.dart';
 import '../models/tutorial.dart';
 import '../services/tutorial_service.dart';
+import 'skill_editor_page.dart';
 
 class SkillLibraryPage extends StatefulWidget {
   final Future<void> Function(Tutorial tutorial, String? sessionId) onStartTutorial;
@@ -64,45 +65,63 @@ class _SkillLibraryPageState extends State<SkillLibraryPage> {
   @override
   Widget build(BuildContext context) {
     return SafeArea(
-      child: Column(
+      child: Stack(
         children: [
-          Padding(
-            padding: const EdgeInsets.fromLTRB(20, 12, 20, 4),
-            child: Row(
-              children: [
-                Builder(
-                  builder: (ctx) => IconButton(
-                    icon: const Icon(Icons.menu, color: Color(0xFF8A8AB0)),
-                    onPressed: () => Scaffold.of(ctx).openDrawer(),
-                  ),
-                ),
-                const SizedBox(width: 4),
-                Container(
-                  width: 38, height: 38,
-                  decoration: BoxDecoration(
-                    gradient: const LinearGradient(colors: [Color(0xFF667EEA), Color(0xFF764BA2)]),
-                    borderRadius: BorderRadius.circular(12),
-                  ),
-                  child: const Icon(Icons.bookmark, color: Colors.white, size: 20),
-                ),
-                const SizedBox(width: 10),
-                const Column(
-                  crossAxisAlignment: CrossAxisAlignment.start,
+          Column(
+            children: [
+              Padding(
+                padding: const EdgeInsets.fromLTRB(20, 12, 20, 4),
+                child: Row(
                   children: [
-                    Text('技能库', style: TextStyle(color: Colors.white, fontSize: 16, fontWeight: FontWeight.w700)),
-                    Text('从云端加载预置教程', style: TextStyle(color: Color(0xFF6A6A9A), fontSize: 11)),
+                    Builder(
+                      builder: (ctx) => IconButton(
+                        icon: const Icon(Icons.menu, color: Color(0xFF8A8AB0)),
+                        onPressed: () => Scaffold.of(ctx).openDrawer(),
+                      ),
+                    ),
+                    const SizedBox(width: 4),
+                    Container(
+                      width: 38, height: 38,
+                      decoration: BoxDecoration(
+                        gradient: const LinearGradient(colors: [Color(0xFF667EEA), Color(0xFF764BA2)]),
+                        borderRadius: BorderRadius.circular(12),
+                      ),
+                      child: const Icon(Icons.bookmark, color: Colors.white, size: 20),
+                    ),
+                    const SizedBox(width: 10),
+                    const Column(
+                      crossAxisAlignment: CrossAxisAlignment.start,
+                      children: [
+                        Text('技能库', style: TextStyle(color: Colors.white, fontSize: 16, fontWeight: FontWeight.w700)),
+                        Text('从云端加载预置教程', style: TextStyle(color: Color(0xFF6A6A9A), fontSize: 11)),
+                      ],
+                    ),
+                    const Spacer(),
+                    TextButton.icon(
+                      onPressed: () => _importDemo(),
+                      icon: const Icon(Icons.rocket_launch, size: 14, color: Color(0xFF22C55E)),
+                      label: const Text('演示导入', style: TextStyle(color: Color(0xFF22C55E), fontSize: 11)),
+                    ),
+                    TextButton.icon(
+                      onPressed: _loadSkills,
+                      icon: const Icon(Icons.refresh, size: 16, color: Color(0xFF6A6A9A)),
+                      label: const Text('刷新', style: TextStyle(color: Color(0xFF6A6A9A), fontSize: 12)),
+                    ),
                   ],
                 ),
-                const Spacer(),
-                TextButton.icon(
-                  onPressed: _loadSkills,
-                  icon: const Icon(Icons.refresh, size: 16, color: Color(0xFF6A6A9A)),
-                  label: const Text('刷新', style: TextStyle(color: Color(0xFF6A6A9A), fontSize: 12)),
-                ),
-              ],
+              ),
+              Expanded(child: _buildBody()),
+            ],
+          ),
+          Positioned(
+            right: 16,
+            bottom: 16,
+            child: FloatingActionButton(
+              backgroundColor: const Color(0xFF667EEA),
+              onPressed: () => _navigateToEditor(),
+              child: const Icon(Icons.add, color: Colors.white),
             ),
           ),
-          Expanded(child: _buildBody()),
         ],
       ),
     );
@@ -232,5 +251,49 @@ class _SkillLibraryPageState extends State<SkillLibraryPage> {
         ],
       ),
     );
+  }
+
+  Future<void> _navigateToEditor() async {
+    final result = await Navigator.of(context).push<bool>(
+      MaterialPageRoute(builder: (_) => const SkillEditorPage()),
+    );
+    if (result == true) _loadSkills();
+  }
+
+  Future<void> _importDemo() async {
+    try {
+      final service = TutorialService(baseUrl: AppConfig.backendUrl);
+      final demos = await service.fetchDemos();
+      if (!mounted) return;
+      if (demos.isEmpty) {
+        ScaffoldMessenger.of(context).showSnackBar(
+          const SnackBar(content: Text('暂无预分析演示数据，请先在后端执行 pre-analyze')),
+        );
+        return;
+      }
+      final selected = await showDialog<Map<String, dynamic>>(
+        context: context,
+        builder: (ctx) => SimpleDialog(
+          title: const Text('选择演示视频导入', style: TextStyle(color: Colors.white)),
+          backgroundColor: const Color(0xFF1A1A35),
+          children: demos.map((d) => SimpleDialogOption(
+            onPressed: () => Navigator.of(ctx).pop(d),
+            child: Text('${d['title']}', style: const TextStyle(color: Color(0xFF8A8AB0))),
+          )).toList(),
+        ),
+      );
+      if (selected != null && mounted) {
+        final result = await Navigator.of(context).push<bool>(
+          MaterialPageRoute(builder: (_) => SkillEditorPage(prefillDemo: selected)),
+        );
+        if (result == true) _loadSkills();
+      }
+    } catch (e) {
+      if (mounted) {
+        ScaffoldMessenger.of(context).showSnackBar(
+          SnackBar(content: Text('加载失败：$e')),
+        );
+      }
+    }
   }
 }

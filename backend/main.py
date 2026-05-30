@@ -6,6 +6,7 @@ from dotenv import load_dotenv
 from fastapi import FastAPI, Request
 from fastapi.middleware.cors import CORSMiddleware
 from fastapi.staticfiles import StaticFiles
+from starlette.datastructures import UploadFile
 from slowapi import Limiter, _rate_limit_exceeded_handler
 from slowapi.util import get_remote_address
 from slowapi.errors import RateLimitExceeded
@@ -43,6 +44,7 @@ app = FastAPI(
     title="AI Tutorial Backend",
     version="2.0.0",
     lifespan=lifespan,
+    max_request_body_size=500 * 1024 * 1024,
 )
 
 app.state.limiter = limiter

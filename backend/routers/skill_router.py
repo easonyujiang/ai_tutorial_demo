@@ -120,10 +120,12 @@ async def analyze_video_upload(file: UploadFile = File(...)):
     tmp_path = os.path.join(tempfile.gettempdir(), f"upload_{session_id}{ext}")
 
     try:
+        total = 0
         with open(tmp_path, "wb") as f:
-            content = await file.read()
-            f.write(content)
-        logger.info("Web skill upload: %s (%.1fMB)", file.filename, len(content) / 1024 / 1024)
+            while chunk := await file.read(2 * 1024 * 1024):
+                f.write(chunk)
+                total += len(chunk)
+        logger.info("Web skill upload: %s (%.1fMB)", file.filename, total / 1024 / 1024)
 
         result = await asyncio.to_thread(ai_analyze, tmp_path)
     except Exception as e:

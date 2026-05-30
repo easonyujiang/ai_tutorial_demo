@@ -6,7 +6,8 @@ import time
 import uuid
 from pathlib import Path
 
-from fastapi import APIRouter, HTTPException, Request
+from fastapi import APIRouter, HTTPException, Request, File, UploadFile
+from fastapi.responses import FileResponse
 from pydantic import BaseModel
 
 from infrastructure.logger import get_logger
@@ -88,6 +89,26 @@ async def import_local_videos(request: Request, body: ImportLocalVideosRequest):
         "count": len(imported),
         "items": imported,
     }
+
+
+class LocalFileReadRequest(BaseModel):
+    path: str
+
+
+@router.post("/read-local-file")
+async def read_local_file(req: LocalFileReadRequest):
+    file_path = Path(req.path)
+    if not file_path.exists():
+        raise HTTPException(status_code=404, detail="文件不存在")
+    ext = file_path.suffix.lower()
+    media_type = "application/octet-stream"
+    if ext in {".mp4", ".m4v"}:
+        media_type = "video/mp4"
+    elif ext in {".mov"}:
+        media_type = "video/quicktime"
+    elif ext in {".avi"}:
+        media_type = "video/x-msvideo"
+    return FileResponse(str(file_path), media_type=media_type)
 
 
 # ── Pre-computed Demo API ──────────────────────────────────────────

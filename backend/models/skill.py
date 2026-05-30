@@ -27,6 +27,7 @@ class Skill(BaseModel):
     os_allowlist: str = ""
     launch_package: str = ""
     launch_activity: str = ""
+    video_url: str = ""
     steps: list[SkillStep] = []
     created_at: str = ""
     updated_at: str = ""

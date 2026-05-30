@@ -5,5 +5,7 @@ __pycache__/
 backend/.env
 frontend/build/
 backend/demo_videos/
+视频仓库/
+视频仓库.zip
 CMakeFiles/
 CMakeCache.txt
