@@ -53,6 +53,19 @@ async def run_analysis(session: TutorialSession, session_manager):
         platform = detect_platform(pure_url)
         logger.info("Platform detected: %s", platform)
 
+        if platform == "bilibili":
+            _update_progress(session, session_manager, "B站风控拦截，使用预分析演示模式", SessionStatus.READY)
+            session.title = "演示教程（B站风控，请用本地视频或预分析演示）"
+            session.platform = "bilibili"
+            session.steps = [
+                TutorialStep(index=0, instruction="打开目标应用或回到需要操作的页面", target_text="", target_type="icon", target_description="无（演示步骤）", page_description="任意页面"),
+                TutorialStep(index=1, instruction="按照教程提示找到对应按钮并点击", target_text="", target_type="icon", target_description="无（演示步骤）", page_description="任意页面"),
+                TutorialStep(index=2, instruction="完成操作后返回本应用继续下一步", target_text="", target_type="icon", target_description="无（演示步骤）", page_description="任意页面"),
+            ]
+            elapsed = time.perf_counter() - t_start
+            logger.info("B站分析跳过（风控）: session=%s (%.1fs)", session_id, elapsed)
+            return
+
         video_url = resolve_short_url(pure_url)
 
         _update_progress(session, session_manager, "正在下载视频...")
