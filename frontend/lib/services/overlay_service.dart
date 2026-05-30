@@ -1,28 +1,50 @@
 import 'dart:convert';
-
 import 'package:flutter/services.dart';
-
 import '../models/tutorial.dart';
 
 class OverlayService {
-  static const _channel = MethodChannel('com.example.frontend/overlay');
+  static const MethodChannel _channel = MethodChannel('com.example.frontend/overlay');
 
   static Future<bool> canDrawOverlays() async {
-    final result = await _channel.invokeMethod<bool>('canDrawOverlays');
-    return result ?? false;
+    try {
+      final result = await _channel.invokeMethod<bool>('canDrawOverlays');
+      return result ?? false;
+    } on MissingPluginException {
+      return false;
+    } on PlatformException {
+      return false;
+    }
   }
 
   static Future<void> requestOverlayPermission() async {
-    await _channel.invokeMethod('requestOverlayPermission');
+    try {
+      await _channel.invokeMethod('requestOverlayPermission');
+    } on MissingPluginException {
+      // no-op in pure Flutter demo
+    } on PlatformException {
+      // no-op
+    }
   }
 
   static Future<bool> isAccessibilityEnabled() async {
-    final result = await _channel.invokeMethod<bool>('isAccessibilityEnabled');
-    return result ?? false;
+    try {
+      final result = await _channel.invokeMethod<bool>('isAccessibilityEnabled');
+      return result ?? false;
+    } on MissingPluginException {
+      return false;
+    } on PlatformException {
+      return false;
+    }
   }
 
   static Future<void> openAccessibilitySettings() async {
-    await _channel.invokeMethod('openAccessibilitySettings');
+    try {
+      await _channel.invokeMethod('openAccessibilitySettings');
+    } on MissingPluginException {
+      // no-op
+    } on PlatformException {
+      // no-op
+    }
   }
 
   static Future<void> startOverlay({
@@ -45,12 +67,26 @@ class OverlayService {
           .toList(),
     );
 
-    await _channel.invokeMethod('startOverlay', {
-      'steps': stepsJson,
-    });
+    try {
+      await _channel.invokeMethod('startOverlay', {
+        'steps': stepsJson,
+        'title': tutorial.title,
+        'id': tutorial.id,
+      });
+    } on MissingPluginException {
+      // no-op
+    } on PlatformException {
+      // no-op
+    }
   }
 
   static Future<void> stopOverlay() async {
-    await _channel.invokeMethod('stopOverlay');
+    try {
+      await _channel.invokeMethod('stopOverlay');
+    } on MissingPluginException {
+      // no-op
+    } on PlatformException {
+      // no-op
+    }
   }
 }

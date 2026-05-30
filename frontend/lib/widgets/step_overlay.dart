@@ -3,7 +3,7 @@ import 'instruction_bubble.dart';
 
 class StepOverlay extends StatelessWidget {
   final Size screenSize;
-  final Rect relativeRect;   // 0~1 比例
+  final Rect relativeRect; // 0~1 比例
   final String instruction;
   final String bubbleDirection;
 
@@ -29,24 +29,33 @@ class StepOverlay extends StatelessWidget {
         // 四块遮罩留出目标区域
         // 上
         Positioned(
-          top: 0, left: 0, right: 0,
+          top: 0,
+          left: 0,
+          right: 0,
           height: r.top,
           child: Container(color: Colors.black54),
         ),
         // 下
         Positioned(
-          top: r.bottom, left: 0, right: 0, bottom: 0,
+          top: r.bottom,
+          left: 0,
+          right: 0,
+          bottom: 0,
           child: Container(color: Colors.black54),
         ),
         // 左
         Positioned(
-          top: r.top, bottom: r.bottom, left: 0,
+          top: r.top,
+          bottom: r.bottom,
+          left: 0,
           width: r.left,
           child: Container(color: Colors.black54),
         ),
         // 右
         Positioned(
-          top: r.top, bottom: r.bottom, right: 0,
+          top: r.top,
+          bottom: r.bottom,
+          right: 0,
           width: screenSize.width - r.right,
           child: Container(color: Colors.black54),
         ),

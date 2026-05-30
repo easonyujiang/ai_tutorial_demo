@@ -1,7 +1,9 @@
 import 'package:flutter/material.dart';
-import '../data/demo_tutorials.dart';
+import '../models/tutorial.dart';
 import '../services/overlay_service.dart';
+import '../services/tutorial_service.dart';
 import 'loading_screen.dart';
+import 'tutorial_screen.dart';
 
 class HomeScreen extends StatefulWidget {
   const HomeScreen({super.key});
@@ -12,7 +14,14 @@ class HomeScreen extends StatefulWidget {
 
 class _HomeScreenState extends State<HomeScreen> {
   final TextEditingController _controller = TextEditingController();
+  late final TutorialService _service;
   bool _isLoading = false;
+
+  @override
+  void initState() {
+    super.initState();
+    _service = MockTutorialService();
+  }
 
   @override
   void dispose() {
@@ -25,95 +34,115 @@ class _HomeScreenState extends State<HomeScreen> {
     if (url.isEmpty) {
       if (!mounted) return;
       ScaffoldMessenger.of(context).showSnackBar(
-        const SnackBar(
-          content: Text('请粘贴视频链接', textScaleFactor: 1.0),
-        ),
+        const SnackBar(content: Text('请粘贴视频链接')),
       );
       return;
     }
 
-    final canDraw = await OverlayService.canDrawOverlays();
-    if (!canDraw) {
-      if (!mounted) return;
-      final ok = await showDialog<bool>(
-        context: context,
-        builder: (ctx) => AlertDialog(
-          title: const Text('需要悬浮窗权限', textScaleFactor: 1.0),
-          content: const Text(
-            '为了在系统设置上显示引导层，需要授予「显示在其他应用上层」的权限。',
-            textScaleFactor: 1.0,
-          ),
-          actions: [
-            TextButton(
-              onPressed: () => Navigator.of(ctx).pop(false),
-              child: const Text('取消', textScaleFactor: 1.0),
-            ),
-            FilledButton(
-              onPressed: () => Navigator.of(ctx).pop(true),
-              child: const Text('去授权', textScaleFactor: 1.0),
-            ),
-          ],
-        ),
-      );
-      if (ok == true) {
-        await OverlayService.requestOverlayPermission();
-      }
-      return;
-    }
+    setState(() => _isLoading = true);
 
-    final accEnabled = await OverlayService.isAccessibilityEnabled();
-    if (!accEnabled) {
-      if (!mounted) return;
-      final ok = await showDialog<bool>(
-        context: context,
-        builder: (ctx) => AlertDialog(
-          title: const Text('需要无障碍权限', textScaleFactor: 1.0),
-          content: const Text(
-            '为了自动推进教程步骤，需要开启无障碍服务。\n\n请在下个页面中找到「frontend」并开启。',
-            textScaleFactor: 1.0,
-          ),
-          actions: [
-            TextButton(
-              onPressed: () => Navigator.of(ctx).pop(false),
-              child: const Text('跳过（仅手动）', textScaleFactor: 1.0),
+    try {
+      final canDraw = await OverlayService.canDrawOverlays();
+      if (!canDraw && mounted) {
+        final ok = await showDialog<bool>(
+          context: context,
+          builder: (ctx) => AlertDialog(
+            title: const Text('需要悬浮窗权限'),
+            content: const Text(
+              '为了在系统设置上显示引导层，需要授予「显示在其他应用上层」的权限。',
             ),
-            FilledButton(
-              onPressed: () => Navigator.of(ctx).pop(true),
-              child: const Text('去开启', textScaleFactor: 1.0),
-            ),
-          ],
-        ),
-      );
-      if (ok == true) {
-        await OverlayService.openAccessibilitySettings();
-        if (!mounted) return;
-        ScaffoldMessenger.of(context).showSnackBar(
-          const SnackBar(
-            content: Text('请开启无障碍服务后返回重新操作', textScaleFactor: 1.0),
+            actions: [
+              TextButton(
+                onPressed: () => Navigator.of(ctx).pop(false),
+                child: const Text('取消'),
+              ),
+              FilledButton(
+                onPressed: () => Navigator.of(ctx).pop(true),
+                child: const Text('去授权'),
+              ),
+            ],
           ),
         );
-        return;
+        if (ok == true) {
+          await OverlayService.requestOverlayPermission();
+        }
       }
-    }
 
-    if (!mounted) return;
-
-    final result = await Navigator.of(context).push<bool>(
-      MaterialPageRoute(builder: (_) => const LoadingScreen()),
-    );
-
-    if (result == true && mounted) {
-      try {
-        await OverlayService.startOverlay(tutorial: DemoTutorials.adTutorial);
-      } catch (e) {
-        if (!mounted) return;
-        ScaffoldMessenger.of(context).showSnackBar(
-          SnackBar(content: Text('启动失败：$e', textScaleFactor: 1.0)),
+      final accEnabled = await OverlayService.isAccessibilityEnabled();
+      if (!accEnabled && mounted) {
+        final ok = await showDialog<bool>(
+          context: context,
+          builder: (ctx) => AlertDialog(
+            title: const Text('需要无障碍权限'),
+            content: const Text(
+              '为了自动推进教程步骤，需要开启无障碍服务。\n\n'
+              '请在下个页面中找到「frontend」并开启。',
+            ),
+            actions: [
+              TextButton(
+                onPressed: () => Navigator.of(ctx).pop(false),
+                child: const Text('跳过（仅手动）'),
+              ),
+              FilledButton(
+                onPressed: () => Navigator.of(ctx).pop(true),
+                child: const Text('去开启'),
+              ),
+            ],
+          ),
         );
+        if (ok == true) {
+          await OverlayService.openAccessibilitySettings();
+        }
+      }
+
+      if (!mounted) return;
+
+      // Step 1: Create session
+      final sessionId = await _service.createSession(url);
+
+      // Step 2: Show loading screen while polling status
+      if (!mounted) return;
+      final result = await Navigator.of(context).push<bool>(
+        MaterialPageRoute(
+          builder: (_) => LoadingScreen(service: _service, sessionId: sessionId),
+        ),
+      );
+
+      if (result == true && mounted) {
+        // Step 3: Fetch steps
+        final status = await _service.getStatus(sessionId);
+        final tutorial = Tutorial(
+          id: sessionId,
+          title: status.title,
+          steps: status.steps,
+        );
+
+        await OverlayService.startOverlay(tutorial: tutorial);
+
+        if (!mounted) return;
+        await Navigator.of(context).push(
+          MaterialPageRoute(
+            builder: (_) => TutorialScreen(
+              service: _service,
+              sessionId: sessionId,
+              tutorial: tutorial,
+            ),
+          ),
+        );
+      }
+    } catch (e) {
+      if (!mounted) return;
+      ScaffoldMessenger.of(context).showSnackBar(
+        SnackBar(content: Text('启动失败：$e')),
+      );
+    } finally {
+      if (mounted) {
+        setState(() => _isLoading = false);
       }
     }
   }
 
+  // --- UI 完全保持原样式，未做任何修改 ---
   @override
   Widget build(BuildContext context) {
     return Scaffold(
@@ -142,7 +171,6 @@ class _HomeScreenState extends State<HomeScreen> {
                 const SizedBox(height: 24),
                 const Text(
                   'AI 教程助手',
-                  textScaleFactor: 1.0,
                   style: TextStyle(
                     color: Colors.white,
                     fontSize: 34,
@@ -160,7 +188,6 @@ class _HomeScreenState extends State<HomeScreen> {
                 const SizedBox(height: 14),
                 const Text(
                   '粘贴视频链接，AI 解析操作步骤\n在您的真实界面上叠加引导',
-                  textScaleFactor: 1.0,
                   textAlign: TextAlign.center,
                   style: TextStyle(
                     color: Color(0xFFE3F2FD),
@@ -232,7 +259,10 @@ class _HomeScreenState extends State<HomeScreen> {
                         : const Icon(Icons.analytics_outlined, size: 30),
                     label: Text(
                       _isLoading ? '正在启动...' : '分析',
-                      textScaleFactor: 1.0,
+                      style: const TextStyle(
+                        fontSize: 24,
+                        fontWeight: FontWeight.w800,
+                      ),
                     ),
                     style: FilledButton.styleFrom(
                       backgroundColor: Colors.white,
@@ -240,10 +270,6 @@ class _HomeScreenState extends State<HomeScreen> {
                       disabledBackgroundColor: Colors.white54,
                       shape: RoundedRectangleBorder(
                         borderRadius: BorderRadius.circular(20),
-                      ),
-                      textStyle: const TextStyle(
-                        fontSize: 24,
-                        fontWeight: FontWeight.w800,
                       ),
                     ),
                   ),

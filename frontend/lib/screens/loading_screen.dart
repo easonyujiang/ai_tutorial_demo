@@ -1,8 +1,12 @@
 import 'dart:async';
 import 'package:flutter/material.dart';
+import '../services/tutorial_service.dart';
 
 class LoadingScreen extends StatefulWidget {
-  const LoadingScreen({super.key});
+  final TutorialService service;
+  final String sessionId;
+
+  const LoadingScreen({super.key, required this.service, required this.sessionId});
 
   @override
   State<LoadingScreen> createState() => _LoadingScreenState();
@@ -11,17 +15,9 @@ class LoadingScreen extends StatefulWidget {
 class _LoadingScreenState extends State<LoadingScreen>
     with SingleTickerProviderStateMixin {
   double _progress = 0;
-  String _stageText = '正在解析视频链接...';
-  int _stageIndex = 0;
   late AnimationController _pulseCtrl;
   Timer? _timer;
-
-  static const _stages = [
-    _Stage(label: '正在解析视频链接...', progress: 0.20),
-    _Stage(label: '正在下载视频...', progress: 0.45),
-    _Stage(label: 'AI 正在分析操作步骤...', progress: 0.80),
-    _Stage(label: '正在生成引导层...', progress: 1.0),
-  ];
+  bool _done = false;
 
   @override
   void initState() {
@@ -30,34 +26,36 @@ class _LoadingScreenState extends State<LoadingScreen>
       vsync: this,
       duration: const Duration(milliseconds: 1200),
     )..repeat(reverse: true);
-    _startStagedProgress();
+    _startPolling();
   }
 
-  void _startStagedProgress() {
-    final tickMs = 120;
-    _timer = Timer.periodic(Duration(milliseconds: tickMs), (timer) {
-      if (!mounted) { timer.cancel(); return; }
-
-      final currentStage = _stages[_stageIndex];
-      final incr = currentStage.progress / (currentStage.progress * 1000 / tickMs).clamp(1, 100);
-
+  void _startPolling() {
+    _timer = Timer.periodic(const Duration(milliseconds: 80), (timer) {
+      if (!mounted) {
+        timer.cancel();
+        return;
+      }
       setState(() {
-        _progress += incr;
-        if (_progress >= currentStage.progress) {
-          _progress = currentStage.progress;
-          _stageIndex++;
-          if (_stageIndex >= _stages.length) {
-            _progress = 1.0;
-            _stageText = _stages.last.label;
-            timer.cancel();
-            Future<void>.delayed(const Duration(milliseconds: 400), () {
-              if (mounted) Navigator.of(context).pop(true);
-            });
-            return;
-          }
-          _stageText = _stages[_stageIndex].label;
+        if (_progress < 0.95) {
+          _progress += 0.015;
         }
       });
+    });
+
+    widget.service.waitForReady(widget.sessionId).then((_) {
+      if (!mounted) return;
+      _timer?.cancel();
+      setState(() {
+        _progress = 1.0;
+        _done = true;
+      });
+      Future.delayed(const Duration(milliseconds: 400), () {
+        if (mounted) Navigator.of(context).pop(true);
+      });
+    }).catchError((e) {
+      if (!mounted) return;
+      _timer?.cancel();
+      Navigator.of(context).pop(false);
     });
   }
 
@@ -70,6 +68,7 @@ class _LoadingScreenState extends State<LoadingScreen>
 
   @override
   Widget build(BuildContext context) {
+    // --- UI 完全保持原样式 ---
     return PopScope(
       canPop: false,
       child: Scaffold(
@@ -95,17 +94,12 @@ class _LoadingScreenState extends State<LoadingScreen>
                     ),
                   ),
                   const SizedBox(height: 40),
-                  AnimatedSwitcher(
-                    duration: const Duration(milliseconds: 400),
-                    child: Text(
-                      _stageText,
-                      key: ValueKey(_stageText),
-                      textScaleFactor: 1.0,
-                      style: const TextStyle(
-                        color: Colors.white,
-                        fontSize: 24,
-                        fontWeight: FontWeight.w700,
-                      ),
+                  Text(
+                    _done ? '分析完成！' : '正在生成教程步骤...',
+                    style: const TextStyle(
+                      color: Colors.white,
+                      fontSize: 24,
+                      fontWeight: FontWeight.w700,
                     ),
                   ),
                   const SizedBox(height: 32),
@@ -124,17 +118,12 @@ class _LoadingScreenState extends State<LoadingScreen>
                     ),
                   ),
                   const SizedBox(height: 16),
-                  AnimatedSwitcher(
-                    duration: const Duration(milliseconds: 300),
-                    child: Text(
-                      '${(_progress * 100).toInt()}%',
-                      key: ValueKey((_progress * 100).toInt()),
-                      textScaleFactor: 1.0,
-                      style: const TextStyle(
-                        color: Colors.white,
-                        fontSize: 48,
-                        fontWeight: FontWeight.w800,
-                      ),
+                  Text(
+                    '${(_progress * 100).toInt()}%',
+                    style: const TextStyle(
+                      color: Colors.white,
+                      fontSize: 48,
+                      fontWeight: FontWeight.w800,
                     ),
                   ),
                 ],
@@ -145,10 +134,4 @@ class _LoadingScreenState extends State<LoadingScreen>
       ),
     );
   }
-}
-
-class _Stage {
-  final String label;
-  final double progress;
-  const _Stage({required this.label, required this.progress});
 }

@@ -1,0 +1,12 @@
+__pycache__/
+*.pyc
+*.pyo
+.env
+temp_downloads/
+temp_uploads/
+tutorial_compress/
+demo_videos/
+*.mp4
+*.mov
+.vscode/
+.idea/
